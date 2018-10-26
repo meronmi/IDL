@@ -1,0 +1,2 @@
+l a_sw   a_par	abs_sw abs_par t_sw
+2 0.1494 0.0339 0.4596 0.8044 0.2794

@@ -1,0 +1,444 @@
+; PROCEDURE COMMENTS +
+; NAME: simForwMod_water_lim
+; AUTHOR: Michele Meroni
+; CONTACT INFO: michele.meroni@gmail.com
+
+; DESCRIPTION:
+; Simple vegetation growth model (based on the GRAMI model) coupled with radiative transfer model PROSAIL5b
+; to compute FAPAR from LAI (used internally) and simulate MODIS 7 bands reflectances.
+
+; CALLING SEQUENCE:
+;       output = simForwMod(JD0, laiDOY0, SLA, eps_max, wlim, cap, half_life, bewm_opt, gamma, c, d, a, b, tJD, globrad, globrad2par, tair, tb, proSailVar, satObsJD, satObsRAA, satObsSZA, satObsVZA)
+
+; INPUTS:
+; PARAMETERS are denoted with:
+; (k) = fixed in inversion
+; (kf) = fixed or free in the time series run (and therefore constant at the seasonal level)
+; (f) = free in the seasonal run
+; INPUTS are denoted with: (i)
+
+; JD0:          (f) {scalar} JUlian Day of trhe DOY at which the LAI is laiDOY0, it is used to approximate emergence of the crop
+; laiDOY0:      (kf) {scalar} LAI value at DOY0, emergence
+; SLA:          (kf) {scalar} Specific Leaf Area(m2 g-1)
+; eps_max:      (kf) {scalar} maximum Light Use Efficiency (kgDM GJ_PAR-1 = gDM MJ-1)
+; wlim:         STRUCTURE for water limitation computation
+;               (k) wlim.onoff: 0/1 for deactivating/activating water limitation
+;               (i) wlim.tJD: time axis of precipitation variable (it must start before the other variables, tJD[0]-365) (Julian days)
+;               (i) wlim.tair: air temperature (°C)
+;               (i) wlim.rain: precipitation (mm)
+; cap:          (k)  {scalar} cap value for precipitation (rain>cap is set to rain=cap) (mm)
+; half_life:    (kf) {scalar}half_life control the stepnees of the decay of weights, it's the time (expressed in GDD units) in which
+;                    the weights fall to one half (degree days)
+; bewm_opt:     (kf) {scalar}optimal value for the Backward Exponentially Weighted Mean (mm)
+; gamma:        (k) {scalar} respiration coefficient (set to 0 if eps_max is optimized), re=gamma*GPP
+;               ** Note: gamma has the only effect of maing a distinction between GPP and NPP but it is useless
+;               ** if eddy data are not used in the inversion
+; c:            parameter controlling the leaf lifespan (J = c + d * GDD, as in Maas, 1993)
+;               (f) {scalar} c (DegDays)cts as a base life span
+; d:            parameter controlling the leaf lifespan (J = c + d * GDD, as in Maas, 1993)
+;               (f) {scalar} d (-) controls the lifespan (J) a function of the degree days at emergence,
+;                   e.g., if d if GT 0 it makes the leaves emerging later to live longer
+;Partitioning, GRAMI function (LeafPartitioning_on_GDD)
+; a:            paremeter controlling partitioning (sim.P1 = Max(1-a*EXP(b*GDD), 0) as in Maas, 1993)
+;               (f) {scalar} a (-) controls the magnitude of partitioning
+; b:            paremeter controlling partitioning to new leaves (sim.P1 = Max(1-a*EXP(b*GDD), 0) as in Maas, 1993)
+;Partitioning, Michele's function (LeafPartitioning_on_GDD2)
+; a:            paremeter controlling the length of the period of leaf partitioning (sim.P1 = MAX([1.0 - (GDD/(GDD+EXP(b)*(a-GDD))),0.0]))
+;               (f) {scalar} a (-) controls the length
+; b:            paremeter controlling the shape of the decay of partitioning, pecial cases:
+;               b<0: convex function(U shape)
+;               b=0: linear decreasong function
+;               b>0: concave function (standard behaviour, in this case it resample the exponential of GRAMI)
+;               (f) {scalar} b (-) controls how quickly partitioning is reduced with GDD
+; tJD:          (i) {array} time axis of meteo variables (in Julian Day)
+; globrad:      (i) {array} Global radiation (GJ ha-1 d-1)
+; globrad2par:  (k) {scalar} conversion factor from Global radiation to PAR *
+; tair:         (i) {array} Air temperature (°C)
+; tb:           (k) {scalar} base temperature to comput degree days (dDD = MAX(Tair-Tb, 0)
+; proSailVar:   PROSAIL PARAMETERS {structure}
+;               (k) proSailVar.Cab    : chlorophyll content (µg.cm-2) (0-100 ug cm-2)
+;               (k) proSailVar.Car    : carotenoid content (µg.cm-2)  (0-25 ug cm-2)
+;               (k) proSailVar.Cbrown : brown pigment content (0-1 arbitrary units)
+;               (k) proSailVar.Cw     : EWT (cm) - Equivalent water thickness (0-0.05 cm)
+;               (k) proSailVar.Cm     : LMA (g.cm-2) - leaf mass per unit leaf area (0-0.02 g cm-2)
+;               (k) proSailVar.Ns     : N structure coefficient (1-3 dimensionless)
+;               (k) proSailVar.lidf_a : LIDFa LIDF parameter a, which controls the average leaf slope
+;               (k) proSailVar.lidf_b : LIDFb LIDF parameter b, which controls the distribution's bimodality
+;               (f) proSailVar.lai    : leaf area index
+;               (k) proSailVar.hspot  : hot spot parameter
+;               (i) proSailVar.tts    : solar zenith angle (°)
+;               (i) proSailVar.tto    : observer zenith angle (°)
+;               (i) proSailVar.psi    : azimuth (°)
+;               (i) proSailVar.rsoil  : {array} spectral soil reflectance (0-1), extracted from the 1st NDVI percentile oh hystorical distribution
+; satObsJD:     (i) {array} Julian Day for which a satellite observation is available
+; satObsRAA:    (i) {array} Relative Azimuth Angle (between sun and obs) (-180, +180°)
+; satObsSZA:    (i) {array} Solar Zenith Angle (0, 90°)
+; satObsVZA:    (i) {array} View Zenith Angle (0, 90°)
+;
+; OUTPUTS:
+; Structure res
+; res.gpp
+; res.lai
+; res.ModRef (array 7 columns, n raws)
+;
+; OPTIONAL OUTPUTS:
+; OPTIONAL INPUT KEYWORD(S):
+; NOTES:
+;* on global radiation:
+;   ecmwf glob rad is KJ m-2
+;   eddy glob rad  is MJ m-2 (even if in the xls file is W m-2)
+; METHOD:
+; EXAMPLE:
+; MODIFICATION HISTORY:
+; 14 July 2014: Cleaning
+; 28 Aug 2014: Sumlation is started at the the first day of the time array (tJD[0]) instead
+; of JD0. Therefore, LAI = 0 until JD0 and the spectral reflecantances are those of the background.
+; (previous version save as simforwmodV1.pro)
+; 29 Sep 2014: water limitation (eps_s) added
+; CODING NOTES:
+;
+
+
+FUNCTION simForwMod_water_lim, JD0, laiDOY0, SLA, eps_max, wlim, cap, half_life, bewm_opt, gamma, c, d, a, b, tJD, globrad, globrad2par, tair, tb, proSailVar, satObsJD, satObsRAA, satObsSZA, satObsVZA
+  @cb_various.comm
+  ;COMMON wlim, wLimParFixed, wlim_type, kc, bewm, et0, bewm_et0, wpar, rsrLR, cwl, wl, P1_sen_model
+
+  !EXCEPT=2
+  ; Similar to GRAMI.
+  ;
+  ; Input variable are provided at daily time step, the simulation is conducted from DOY0 to DOY0+N_ELEMENTS(globrad)
+
+  ;DA FARE completamante:
+
+  ;- partitioning HI
+  ;- leaf life span, it should take into account temperature and water stress
+
+  ;DIFFERENCES WITH GRAMI:
+  ; - GDD is compute from emergence
+  ; - GDD are used only in the leaf lifespan, not in phenology determination
+  ; - DOY0 is determined in the inversion of the model against RS observation
+  ; - water limitation
+  ;- PROSAIL is used to compute FAPAR (see details in d:\Users\meronmi\Documents\IDL\simmod\Coupled Model\PROSAIL\DOCS\ MM modifications to prosail.docx
+
+
+
+  ;TIC
+  ;TIC, /PROFILER
+
+
+  ; Initialize varaiables
+  ; number of days to be simulated
+  Tb = FLOAT(tb)
+  nDays = N_ELEMENTS(tJD)
+  ; - returned variables
+  sim = { gdd:            FLTARR(nDays)*0.0, $              ;cumulated growing dergree days
+    fa:             FLTARR(nDays), $              ;fapar
+    lai:            FLTARR(nDays), $              ;lai
+    dlai:           FLTARR(nDays) , $             ;daily increment in LAI
+    dlai_senescent: FLTARR(nDays) , $             ;daily reduction in LAI
+    gpp:            FLTARR(nDays), $              ;daily GPP value
+    npp:            FLTARR(nDays), $              ;cumulative NPP value
+    ;cgpp:           FLTARR(nDays), $              ;cumulative GPP value
+    ;cnpp:           FLTARR(nDays), $              ;cumulative NPP value
+    P1:             FLTARR(nDays), $              ;patitioning into leaves
+    ;sen:            DBLARR(nDays), $              ;patitioning into senescence (only used with abondoned logistic)
+    eps_s:          FLTARR(nDays), $              ;eps stress
+    ModRef:         FLTARR(7, nDays)*!VALUES.F_NAN, $
+    NRTtJDOfMax:    0.0}   ;simulated MODIS reflectances
+
+  ; - working variables
+  J = FLTARR(nDays)                                       ;leaf lifespan for leaf emerged each day in degree days
+  ddLeafAge = FLTARR(nDays)                              ;cumulative degree days from each day up to t, use for senescence
+  aliveLeaf = BYTARR(nDays) + 1                          ;aliveLeaf[t] = 1 if the leaves emerged at t are still alive, 0 if they were removed already
+  ;dgpp = FLTARR(nDays)*!VALUES.F_NAN
+  ;dnpp = FLTARR(nDays)*!VALUES.F_NAN        ;daily increments of GPP and NPP
+
+  ; Convert Global radiation to PAR
+  par = globrad2par * globrad                   ;(GJ ha-1 d-1)
+
+  ; Time domain
+  indTJD0 = WHERE(tJD EQ JD0)                   ;index of the day at which LAI is set to laiDOY0, it is LAI = 0 before
+  indTJD0 = indTJD0[0]    ;cast to a scalar
+  ; Time index for wlim (that starts befote tJD)
+  indWlimTJD0 = WHERE(wlim.tJD EQ JD0)
+  indWlimTJD0 = indWlimTJD0[0]    ;cast to a scalar
+  ;Make sure that SLA and prosail Cm are consistent
+  proSailVar.cm = 1.d/(SLA*100.d*100.d)
+
+  laiDOY0removed = 0                            ;flag used to avoid checking if laiDOY0 is removed once it is removed
+  tOfMaxLai = 0
+  maxLaiReached = 0                             ;boolean, becomes 1 after max LAI is reached, used with casa_kc
+  epsUpdatePostMaxDone = 0
+  tOflaiDOY0removed = -1
+  ;test rel lai - fapar
+  LUTfa = FLTARR(101)
+  LUTl = FINDGEN(101, INCREMENT=0.1)
+  FOR i=0, N_ELEMENTS(l)-1 DO BEGIN
+PRO4SAIL5B,proSailVar.Cab,proSailVar.Car,proSailVar.Cbrown,proSailVar.Cw,proSailVar.Cm, $
+  proSailVar.Ns,proSailVar.lidf_a,proSailVar.lidf_b,LUTl[i],proSailVar.hspot, $
+  0,0,0,proSailVar.rsoil,resh,resv,absh
+  LUTfa[i] = TOTAL(wpar*absh[0:300])
+ENDFOR
+; usage fapar di lai x is INTERPOL(ffa, l, x, /SPLINE)
+;  ll = FINDGEN(1001, INCREMENT=0.01)
+;  res = INTERPOL(ffa, l, ll, /SPLINE)
+;  h = PLOT(l, ffa)
+;  h2 = PLOT(ll, res, color='r', OVERPLOT=1)
+;end_test
+;water limitation
+IF (wlim.eps_onoff EQ 1)THEN BEGIN
+  ;***************************
+  ;DEFINITION OF eps stress
+  CASE wlim_type OF
+    'casa_kc': BEGIN
+      ;in this case wLimParFixed is always 0
+      ;bewm is precomputed, but bewm_et0 cannot be, because of the Kc
+      ;extract relevant data (for the period of analysis only)
+      bewmTmp = extract_timerange(wlim.tJD, tJD[0], tJD[nDays-1], bewm)
+      ;et0 = extract_timerange(ecmwf_data.JD, sJD + DOYoffset, eJD, et0)
+      ;at this point here we don't know when the maximum will be, we can only compute the exp waighted variable until
+      ;indTJD0
+      ;make it until the end,  when the max is recahed it will be modified
+      bewm_et0 = BackwardExpWeightedMean_FAST(wlim.tJD, wlim.tair, [kc.kini*et0[0:indWlimTJD0], kc.kmid*et0[indWlimTJD0+1:-1]], Tb, half_life, 1000.0) ;fg[11], fg[10])
+      bewm_et0_tmp = extract_timerange(wlim.tJD, tJD[0], tJD[-1], bewm_et0)
+      ;CASA Approach for water scaler (Maselli et al, 2009;Field et al., 1995; Potter et al., 1993)
+      ;sim.eps_s[0:indTJD0] = 0.5 + bewmTmp[0:indTJD0] / DOUBLE(bewm_et0_tmp)
+      sim.eps_s = (0.5 + bewmTmp / DOUBLE(bewm_et0_tmp)) < 1.0 ;limite to a max of 1
+      ;SPEED         ;ind = WHERE(sim.eps_s GT 1, count)         ;IF (count GT 0) THEN sim.eps_s[ind] = 1.0
+    END
+    'casa': BEGIN
+      ;if bewm parameters are not free in the inversion do not recomputed at ecah iteration,
+      ;use the one stored in the common block (and compute ind A_simInvMod_handler_water_lim.pro)
+      IF (wLimParFixed EQ 0) THEN BEGIN
+        ;          bewm = BackwardExpWeightedMean_FAST(wlim.tJD, wlim.tair, wlim.rain, half_life, cap)
+        ;          ;bewm et0 should be computed here if adopted (pass the data, remove stop)
+        ;          et0 = extract_timerange(ecmwf_data.JD, sJD + DOYoffset, eJD, ecmwf_data.et0)
+        ;          bewm_et0 = BackwardExpWeightedMean_FAST(wlim.tJD, wlim.tair, et0, fg[11], fg[10])
+        ;          STOP ;a stop is here as this is not anymore used in 2017..
+      ENDIF
+      ; now extract relevant data (for the period of analysis only)
+      bewmTmp = extract_timerange(wlim.tJD, tJD[0], tJD[nDays-1], bewm)
+      ;TEST with ratio bewm_rain/bewn_et0 +
+      bewm_et0_tmp = extract_timerange(wlim.tJD, tJD[0], tJD[nDays-1], bewm_et0)
+      ;CASA Approach for water scaler (Maselli et al, 2009;Field et al., 1995; Potter et al., 1993)
+      sim.eps_s = (0.5 + bewmTmp / DOUBLE(bewm_et0_tmp)) < 1
+    END
+    'bewm_opt': BEGIN
+      ;if bewm parameters are not free in the inversion do not recomputed at ecah iteration,
+      ;use the one stored in the common block (and compute ind A_simInvMod_handler_water_lim.pro)
+      IF (wLimParFixed EQ 0) THEN BEGIN
+        bewm = BackwardExpWeightedMean_FAST(wlim.tJD, wlim.tair, wlim.rain, Tb, half_life, cap)
+        ;bewm et0 should be computed here if adopted (pass the data, remove stop)
+        et0 = extract_timerange(ecmwf_data.JD, sJD + DOYoffset, eJD, ecmwf_data.et0)
+        bewm_et0 = BackwardExpWeightedMean_FAST(wlim.tJD, wlim.tair, et0, Tb, fg[11], fg[10])
+        STOP ;a stop is here as this is not anymore used in 2017..
+      ENDIF
+      ; now extract relevant data (for the period of analysis only)
+      bewmTmp = extract_timerange(wlim.tJD, tJD[0], tJD[nDays-1], bewm)
+      ;exp decay weighted average of p
+      sim.eps_s = (bewmTmp / DOUBLE(bewm_opt)) < 1.0
+    END
+  ENDCASE
+ENDIF ELSE BEGIN
+  ;- eps stress deactivated
+  sim.eps_s = FLTARR(nDays) + 1.0
+ENDELSE
+
+;compute once and for all the GDD from JD0, GDD(JD0)=0
+sim.gdd = [FLTARR(indTJD0+1), computedGDD(Tair[indTJD0:nDays-2], Tb, /CUMULATIVE)]
+;make a check that one of the two is requested
+IF ((P1_sen_model NE 'Logistic') AND (P1_sen_model NE 'MaasLike') AND (P1_sen_model NE 'MaasLikeSen_P1logistic')) THEN STOP
+IF (P1_sen_model EQ 'Logistic') THEN BEGIN
+  ;The logistic model for se is not used anymore
+  sim.P1 = logistic_coeff(c, 'decay', 0.0, a, sim.gdd, 0.01)
+  sim.sen = logistic_coeff(1.0, 'grow', d, b, sim.gdd, 0.01)
+  ;The senescense may be estimated to end after the current period of simulation
+  IF (max(sim.sen) NE 1) THEN sim.sen[-1] = 1.0
+ENDIF
+IF (P1_sen_model EQ 'MaasLikeSen_P1logistic') THEN BEGIN
+  sim.P1 = logistic_coeff(b, 'decay', 0.0, a, sim.gdd, 0.01)
+ENDIF
+;compute once and for all J and the leaf ages in GDD
+IF (P1_sen_model EQ 'MaasLike') OR (P1_sen_model EQ 'MaasLikeSen_P1logistic') THEN BEGIN
+  ;    J2 = FLTARR(nDays)*0
+  ;    ddLeafAge2 = FLTARR(nDays)
+  ;    J2[indTJD0:-2] = c + d * sim.gdd[indTJD0:-2]
+  ;    ddLeafAge2[indTJD0:-1] = [REVERSE(TOTAL(REVERSE((Tair[indTJD0:-2]-Tb > 0.0)), /CUMULATIVE, /DOUBLE, /NAN)),0]
+  J[indTJD0:-2] = c + d * sim.gdd[indTJD0:-2]
+  ddLeafAge[indTJD0:-1] = [REVERSE(TOTAL(REVERSE((Tair[indTJD0:-2]-Tb > 0.0)), /CUMULATIVE, /DOUBLE, /NAN)),0]
+  ;analogous to code commented in the loop
+ENDIF
+FOR t=0, nDays-2 DO BEGIN
+  ; note that tJD[t] = tJD[0] + t
+  ; Until JD0 (subscript indTJD0) only perform spectral simulation with lai = 0
+  ; From JD0 on, start the growth development simulations
+
+  IF (t GE indTJD0) THEN BEGIN
+    ; the model normally compute GPP and new LAI for the current day t and update
+    ; fapar and reflectances for the next day (t+1). However,
+    ; if current t is the day of leaves emergence, fapar and reflectances must be computed
+    ; from scratch
+    IF (t EQ indTJD0) THEN BEGIN
+      sim.lai[t] = laiDOY0
+      sim.dlai[t-1] = laiDOY0
+      ;        proSailVar.lai = sim.lai[t]
+      ;use actual illumination and view geometry if there is a MODIS observation
+      ;if not use closest illum last geometry here (and the last later)
+      !NULL = MIN(ABS(satObsJD-tJD[t]), ind, /NAN)
+PRO4SAIL5B,proSailVar.Cab,proSailVar.Car,proSailVar.Cbrown,proSailVar.Cw,proSailVar.Cm, $
+  proSailVar.Ns,proSailVar.lidf_a,proSailVar.lidf_b,sim.lai[t],proSailVar.hspot, $
+  satObsSZA[ind],satObsVZA[ind],satObsRAA[ind],proSailVar.rsoil,resh,resv,absh
+  ;resample it
+  sim.ModRef[*,t] = resample2MODIS7b(wl, resv, rsrLR)
+  sim.fa[t] = TOTAL(wpar*absh[0:300])
+ENDIF
+;Note the if casa_kc is used for water_lim sim.eps_es is computed up to indTJD0 (include) only
+IF ((wlim_type EQ 'casa_kc') AND ((t GT indTJD0)))THEN BEGIN
+  ;here I have to update sim.eps_s[t] for t. And I hace to use kc.kimd if the max has not be reached yet,
+  ;kc.kend afterwards
+  ;determine if the max LAI was reached (small oscillations are possible (dlai small for clouds, senescence of initial , look for a decrease for few days)
+  IF ((sim.lai[t] LT MAX(sim.lai[0:t])*0.95) AND (maxLaiReached EQ 0) AND (tOflaiDOY0removed NE (t-1))) THEN BEGIN ; condition on tOflaiDOY0removed is because ;the drop is due  lai0 removal, ignore it
+    maxLaiReached = 1
+    tOfMaxLai = t
+  ENDIF
+  IF ((maxLaiReached EQ 1) AND (epsUpdatePostMaxDone EQ 0))THEN BEGIN
+    ;we are after max, use kini, kmid and kend
+    bewm_et0 = BackwardExpWeightedMean_FAST($
+      wlim.tJD, wlim.tair, $
+      [kc.kini*et0[0:indWlimTJD0], kc.kmid*et0[indWlimTJD0+1 : tOfMaxLai - wlim.DOYoffset], $
+      kc.kend*et0[tOfMaxLai - wlim.DOYoffset + 1:-1]], $
+      Tb, half_life, 1000.0)
+    ;knowing that nDays = N_ELEMENTS(tJD)
+    bewm_et0_tmp = extract_timerange(wlim.tJD, tJD[0], tJD[-1], bewm_et0)
+    ;CASA Approach for water scaler (Maselli et al, 2009;Field et al., 1995; Potter et al., 1993)
+    sim.eps_s = 0.5 + bewmTmp / DOUBLE(bewm_et0_tmp)
+    ind = WHERE(sim.eps_s GT 1, count)
+    IF (count GT 0) THEN sim.eps_s[ind] = 1.0
+    ;note this should not be update anymore
+    epsUpdatePostMaxDone = 1
+  ENDIF
+ENDIF
+;compute GPP and NPP for today ;;dgpp[t] = eps_max * sim.eps_s[t] * (sim.fa[t]*par[t])
+;note: no photosynthesis if T < Tb, in this case there is no senescence lai as well
+;dgpp[t] = eps_max * sim.eps_s[t] * (sim.fa[t]*par[t]) * (tair[t] GT Tb)         ;(kg ha-1 d-1)
+sim.gpp[t] = eps_max * sim.eps_s[t] * (sim.fa[t]*par[t]) * (tair[t] GT Tb)         ;(kg ha-1 d-1)
+;sim.gpp[t] = dgpp[t]
+;dnpp[t] = dgpp[t] * (1.0-gamma)                         ;(kg ha-1 d-1)
+
+;the following is correct but commented out to increase speed (no additional info provided)
+sim.npp[t] =sim.gpp[t] * (1.0-gamma)                         ;(kg ha-1 d-1)
+
+;and update cumulated values (not needed here, can be done later and outside this procedure
+;sim.cgpp[t+1] = sim.cgpp[t] + dgpp[t] ;      sim.cgpp[t+1] = sim.cgpp[t] + sim.gpp[t] ;      sim.cnpp[t+1] = sim.cnpp[t] + dnpp[t]
+;partitioning (if logistic is used this is already computed)
+IF (P1_sen_model EQ 'MaasLike') THEN BEGIN
+  ;hyperbolic function
+  sim.P1[t] = LeafPartitioning_on_GDD2(sim.gdd[t], a, b)
+ENDIF
+
+
+; LAI and fAPAR evolution
+;new lai, 1/(100.0*100.0) * SLA * 1000.0 = 0.1 * SLA
+sim.dlai[t] = sim.P1[t] * sim.npp[t] * (0.1 * SLA);(m2 m-2)
+
+; New and Senescent lai
+CASE P1_sen_model OF
+  'MaasLike': opt= 'MaasSen'
+  'Logistic': opt= 'LogisticSen'
+  'MaasLikeSen_P1logistic': opt= 'MaasSen'
+ENDCASE
+CASE opt OF
+  'MaasSen': BEGIN
+    ;find out the past days at which the leaves has reached the lifespan and remove them,
+    ;2 conditions for removing LAI:
+    ; - leaves for those days were not removed already,
+    ; - the age of those days has exceeded its lifespan J
+    ;indSen2 = indTJD0 + WHERE(((ddLeafAge2[indTJD0:t] - ddLeafAge2[t+1]) GT J2[indTJD0:t])AND (aliveLeaf[indTJD0:t] EQ 1), countSen2)
+    indSen = indTJD0 + WHERE(((ddLeafAge[indTJD0:t] - ddLeafAge[t+1]) GT J[indTJD0:t]) AND (aliveLeaf[indTJD0:t] EQ 1), countSen)
+    ;indSen = WHERE((aliveLeaf EQ 1) AND (ddLeafAge GT J), countSen)
+    IF (countSen GT 0) THEN BEGIN
+      ;remove the LAI accumulated during those days
+      sim.dlai_senescent[t] = TOTAL(sim.dlai[indSen])
+      ;if also the first day of growth LAI has to be removed, remove laiDOY0 as well
+      IF (laiDOY0removed EQ 0) THEN BEGIN
+        ind = WHERE(indSen EQ indTJD0, count)
+        IF (count NE 0) THEN BEGIN
+          sim.dlai_senescent[t] = sim.dlai_senescent[t] +  laiDOY0
+          laiDOY0removed = 1
+          tOflaiDOY0removed = t
+        ENDIF
+      ENDIF
+      ;set the leaves to dead
+      aliveLeaf[indSen] = 0
+    ENDIF
+  END
+  'LogisticSen': BEGIN
+    ;from gdd = a I have to start removing LAI from the maximum achieved so far
+    IF (sim.gdd[t] GE d) THEN BEGIN
+      sim.dlai_senescent[t] = MAX(sim.lai)*(sim.sen[t]-sim.sen[t-1])
+    ENDIF ELSE BEGIN
+      sim.dlai_senescent[t] = 0.0
+    ENDELSE
+  END
+  ELSE: STOP
+ENDCASE
+
+
+;Update LAI and FAPAR with net LAI increase
+sim.lai[t+1]=sim.lai[t] + sim.dlai[t] - sim.dlai_senescent[t]
+IF (sim.lai[t+1] GT 20) THEN STOP
+IF (sim.lai[t+1] LT 0) THEN BEGIN
+  ;a small negative value is acceptable as the LAI may be close to zero because of machine precision, e.g.
+  IF (sim.lai[t+1] LT -0.0001) THEN STOP ELSE sim.lai[t+1] = 0.0
+ENDIF
+; conversion of lai into fapar
+;      proSailVar.lai = sim.lai[t]
+;use actual illumination and view geometry if there is a MODIS observation
+;if not use closest illum last geometry here (and the last later)
+!NULL = MIN(ABS(satObsJD-tJD[t+1]), ind, /NAN)
+;      proSailVar.tts = satObsSZA[ind]
+;      proSailVar.tto = satObsVZA[ind]
+;      proSailVar.psi = satObsRAA[ind]
+IF (FINITE(satObsSZA[ind]) NE 1) THEN STOP
+PRO4SAIL5B,proSailVar.Cab,proSailVar.Car,proSailVar.Cbrown,proSailVar.Cw,proSailVar.Cm, $
+  proSailVar.Ns,proSailVar.lidf_a,proSailVar.lidf_b,sim.lai[t],proSailVar.hspot, $
+  satObsSZA[ind],satObsVZA[ind],satObsRAA[ind],proSailVar.rsoil,resh,resv,absh
+  ;      PRO4SAIL5B,proSailVar.Cab,proSailVar.Car,proSailVar.Cbrown,proSailVar.Cw,proSailVar.Cm, $
+  ;        proSailVar.Ns,proSailVar.lidf_a,proSailVar.lidf_b,proSailVar.lai,proSailVar.hspot, $
+  ;        proSailVar.tts,proSailVar.tto,proSailVar.psi,proSailVar.rsoil,resh,resv,absh
+  ;resample it
+  ;sim.ModRef[*,t+1] = rsrArray ## resv
+  ;compute MO
+  sim.ModRef[*,t+1] = resample2MODIS7b(wl, resv, rsrLR)
+  sim.fa[t+1] = TOTAL(wpar*absh[0:300])
+  ;yield
+  ;yield[t]=alpha_g[t]*sim.cnpp[t]    ;(kgDM ha-1 d-1)
+ENDIF ELSE BEGIN
+  ; The section before was execute only from JD0.
+  ; This section is executed before JD0, note that all variables are set to 0 (LAI, GPP, etc.) at their initialization.
+  ; The only variable that must be computed is reflectance, that, in the absence of vegetation, is
+  ; the reflectance of the soil. In addition this reflectance, being considered isotropic, does not change
+  ; with observation geoemtry. Therefore is compute once and for all at the first request.
+  ;      proSailVar.lai = sim.lai[t]
+  ;      ;use standard illumination conditions (it doesn't matter here)
+  ;      proSailVar.tts = 30.0
+  ;      proSailVar.tto = 0.0
+  ;      proSailVar.psi = 0.0
+  ;reample it
+  IF (t EQ 0) THEN modRef0LAI = resample2MODIS7b(wl, proSailVar.rsoil, rsrLR);modRef0LAI = rsrArray ## proSailVar.rsoil;
+  ;    PRO4SAIL5B,proSailVar.Cab,proSailVar.Car,proSailVar.Cbrown,proSailVar.Cw,proSailVar.Cm, $
+  ;               proSailVar.Ns,proSailVar.lidf_a,proSailVar.lidf_b,proSailVar.lai,proSailVar.hspot, $
+  ;               proSailVar.tts,proSailVar.tto,proSailVar.psi,proSailVar.rsoil,resh,resv,absh;
+  ;sim.ModRef[*,t+1] = resample2MODISb(wl, resv, rsrArray)
+  sim.ModRef[*,t] = modRef0LAI
+ENDELSE
+ENDFOR
+;TOC
+;TOC, REPORT=rep_profiler
+;PROFILER, /REPORT
+
+IF (tOfMaxLai EQ 0) THEN sim.NRTtJDOfMax = tJD[-1] ELSE sim.NRTtJDOfMax = tJD[tOfMaxLai]
+;add lai0 at dlai
+;sim.dlai[indTJD0-1] = sim.dlai[t] +  laiDOY0
+RETURN, sim
+END

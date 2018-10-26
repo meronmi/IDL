@@ -1,0 +1,96 @@
+COMMON cb_in, sensor, spat_res, site_code, site_name, cell_size, site_lat, $
+   site_lon, lat1, lat2, lon1, lon2, ini_year, fin_year, numyears, fst_year, fst_dec, $
+   lst_year, nyears, nlines, ncols, julian1, julian2, period, npts, periods, $
+   prod_fields, ignore_below, ignore_above, miss_code, prod_desc, products, $
+   fapar, ibel, iabo, miss, fapar_inter_lin, fapar_inter_qua3, fapar_inter_qua4, $
+   fapar_lomb, fapar_pdhtf, fapar_sigm, nanfapar, acq
+
+;  The following variables are initially set in phenot_p1:
+;     * sensor {string}: The name of the sensor (e.g., 'SeaWiFS', 'MODIS',
+;       'MISR', 'VGT' for Spot-Vegetation, 'MERIS', etc).
+;     * spat_res {floating point}: Spatial resolution of the original data
+;       [in metres].
+;     * site_code {string}: The alphanumeric character string specifying the
+;       country and local site name. This code is typically composed of the
+;       2-letter ISO country code, a dash (-) and an alphanumeric site
+;       identifier.
+;     * site_name {string}: The name of the site for which data are provided.
+;       This is typically the full name of the location of interest, followed
+;       by a comma (,) and by the full name of the country.
+;     * cell_size {integer}: The linear dimension of the square cell over which
+;       the original data are averaged, typically an odd positive number less
+;       than or equal to 15 [in pixels].
+;     * site_lat {floating point}: Latitude of the site [in decimal degrees].
+;     * site_lon {floating point}: Longitude of the site [in decimal degrees].
+;     * lat1 {floating point}: The southernmost latitudinal limit of the window
+;       for which data are extracted from the data base [in decimal degrees].
+;     * lat2 {floating point}: The northernmost latitudinal limit of the window
+;       for which data are extracted from the data base [in decimal degrees].
+;     * lon1 {floating point}: The westernmost longitudinal limit of the window
+;       for which data are extracted from the data base [in decimal degrees].
+;     * lon2 {floating point}: The easternmost longitudinal limit of the window
+;       for which data are extracted from the data base [in decimal degrees].
+;     * ini_year {integer}: The initial year of data (including missing data)
+;       included in the file.
+;     * fin_year {integer}: The final year of data (including missing data)
+;       included in the file.
+;     * numyears {integer}: Total number of years of data in the input file.
+;     * fst_year {integer}: First year of the time series fragment to be
+;       analyzed.
+;     * lst_year {integer}: Last year of the time series fragment to be
+;       analyzed.
+;     * nyears {integer}: Actual number of calendar years of data to be
+;       processed. Input time series data files are expected to always contain
+;       an integer number of calendar years (January to December).
+;     * nlines {integer}: The number of data lines in the subsequent data
+;       section of the file.
+;     * ncols {integer}: The number of data columns (ncols > 9) in the data
+;       section of the file.
+;     * julian1 {long floating point}: Julian day of the first day included in
+;       the period.
+;     * julian2 {long floating point}: Julian day of the last day included in
+;       the period.
+;     * period {integer}: Nominal length (in days) of the period of
+;       representativity of the observation. This is typically 1 for daily, 10
+;       for decadal and 30 for monthly data.
+;     * npts {integer}: Number of data points in the time series fragment to be
+;       analyzed.
+;     * periods {integer array}: Sequential time index of the individual
+;       records, in whatever time units are used (days, decades or months).
+;     * prod_fields {string array [ncols - 9]}: The array containing the names
+;       of the various biogeophysical fields.
+;     * ignore_below {floating point array [ncols - 9]}: The array containing
+;       the smallest acceptable value for each of the (ncols - 9) products.
+;     * ignore_above {floating point array [ncols - 9]}: The array containing
+;       the largest acceptable value for each of the (ncols - 9) products.
+;     * miss_code {floating point array [ncols - 9]}: The codes representing
+;       missing values in each of the (ncols - 9) products.
+;     * prod_desc {string array [ncols - 9]}: The array containing the
+;       descriptions of the various biogeophysical fields.
+;     * products {floating point array [nlines, ncols]}: The 2-D array
+;       containing the biogeophysical products themselves.
+;     * fapar {floating point array}: A copy of the data column of products
+;       that is being analyzed.
+;     * ibel {floating point}: The value of ignore_below appropriate for the
+;       product copied into fapar.
+;     * iabo {floating point}: The value of ignore_above appropriate for the
+;       product copied into fapar.
+;     * miss {floating point}: The value of miss_code appropriate for the
+;       product copied into fapar.
+;     * fapar_inter_lin {floating point array}: A copy of fapar with the missing points
+;       filled in by linear interpolation.
+;     * fapar_inter_qua3 {floating point array}: A copy of fapar with the missing points
+;       filled in by quadratic (3 pts) interpolation.
+;     * fapar_inter_qua4 {floating point array}: A copy of fapar with the missing points
+;       filled in by least squares quadratic (4 pts) interpolation.
+;     * fapar_lomb {floating point array}: A copy of fapar with the missing points
+;       filled in by generating those using the statistically significant frequencies
+;       identified by the Lomb Normalized Periodogram.
+;     * fapar_pdhtf {floating point array}: A copy of fapar with the missing points
+;       filled in by generating those using the PDHTF model, after fitting the growing
+;       season.
+;     * fapar_sigm {floating point array}: A copy of fapar with the missing points
+;       filled in by generating those using the double sigmoid model, after fitting the growing
+;       season.
+;	  * nanfapar {floating point array}: A copy of fapar with the missing points filled with NaN
+;	  * acq (long array): Julian Day of real acquisition day

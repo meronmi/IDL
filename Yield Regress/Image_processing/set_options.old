@@ -1,0 +1,123 @@
+FUNCTION set_options
+@cb_options.comm
+
+;Aggregation options
+UseCropMask=1           ;1: use Area Fraction Crop Mask and compute a weighted average at department level
+                        ;0: don't use any mask, compute the average of all pixels falling in the department
+MinCropFract=0.5        ;(0-1), used only when UseCropMask EQ 1. 
+                        ;Pixels having a fractional crop cover LT MinCropFract are 
+                        ;neglected (not considered in the department average)                        
+UseMaxFaparThreshold=0  ;1: use max fapar threshold. It filters out pixels having 
+                        ;the average yearly maximum LT MaxFaparThreshold). The stack file 
+                        ;containing all the yeraly maxima must be provided.
+                        ;0: consider all pixels
+MaxFaparThreshold=0.1  ;(fAPAR or NDVI units). used only when UseMaxFaparThreshold EQ 1
+                        ;only pixels having a maxFapar value GT than threshold are
+                        ;considered. maxFapar is usually extracted from the corresponding stack file (must be provided)
+MinPixPerDept=50        ;minimum acceptable number of pixels per department. 
+                        ;if the retained number of pixels per department is lower,
+                        ;the program issues a warning
+
+;List of the departments to be considered (department map pixel value) 
+dept_ids=[1,2,3,4,5,6,7,8,9,10]
+
+;Exclude data (set to 0 to consider all or list the data to be escluded)
+excludeDepts=0   
+excludeYears=[1997, 1998]
+
+;Surface from crop mask or from file 
+ComputeSurface = 0      ;1: the surface for production calculation is computed from the crop mask
+                        ;0: the surface is read from file (to be set in set_io)
+
+;Plotting and warning settings
+doplot = 1;1              ;0 suppress plots
+deleteWindows = 1         ;to preserve memory
+verbose = 1;1             ;0 suppress all warnings
+                                
+
+;RS indicators to be used in the analysis
+pheno_products=['g1d99b1','d12','dNDVI11','dNDVI12','dNDVI13','A1-1997_sos1_dekoc_only_1GS','A1-1997_maxv1_only_1GS','A1-1997_maxt1_dekoc_only_1GS']
+;pheno_products=['BPdFAPAR12','BPdFAPAR12'];'MARNDVI1', 'MARNDVI2', 'MARNDVI3', 'MARNDVI4', 'MARNDVI5', 'MARNDVI6', 'MARNDVI7', 'MARNDVI8', 'MARNDVI9', 'MARNDVI10',$
+;'MARNDVI11', 'MARNDVI12', 'MARNDVI13', 'MARNDVI14', 'MARNDVI15', 'MARNDVI16', 'MARNDVI17', 'MARNDVI18', 'MARNDVI19', 'MARNDVI20',$
+;'MARNDVI21', 'MARNDVI22', 'MARNDVI23', 'MARNDVI24', 'MARNDVI25', 'MARNDVI26', 'MARNDVI27', 'MARNDVI28', 'MARNDVI29', 'MARNDVI30',$
+;'MARNDVI31', 'MARNDVI32', 'MARNDVI33', 'MARNDVI34', 'MARNDVI35']
+
+;The following is only used for pheno products
+pheno_val999 = FLTARR(N_ELEMENTS(pheno_products))
+pheno_val999[*] = !VALUES.F_NAN
+
+;pheno_val999=[!VALUES.F_NAN,!VALUES.F_NAN,!VALUES.F_NAN,!VALUES.F_NAN]
+;pheno_val999=[0,0,!VALUES.F_NAN,!VALUES.F_NAN,!VALUES.F_NAN,!VALUES.F_NAN,0,!VALUES.F_NAN]
+IF (N_ELEMENTS(pheno_products) NE N_ELEMENTS(pheno_val999)) THEN STOP 
+
+;pheno_products=['d1','d2','d3','d4','d5','d6','d7','d8','d9','d10','d11','d12','d13','d14','d15', $
+;                'd16','d17','d18','d19','d20','d21','d22','d23','d24','d25','d26','d27','d28','d29','d30', $
+;                "g1d1b0","g1d1b1","g1d5b0","g1d5b1","g1d10b0","g1d10b1","g1d20b0","g1d20b1","g1d30b0", $
+;                "g1d30b1","g1d40b0","g1d40b1","g1d50b0","g1d50b1","g1d60b0","g1d60b1","g1d70b0","g1d70b1",$
+;                "g1d80b0","g1d80b1","g1d90b0","g1d90b1","g1d99b0","g1d99b1","g5d1b0","g5d1b1","g5d5b0",$
+;                "g5d5b1","g5d10b0","g5d10b1","g5d20b0","g5d20b1","g5d30b0","g5d30b1","g5d40b0","g5d40b1",$
+;                "g5d50b0","g5d50b1","g5d60b0","g5d60b1","g5d70b0","g5d70b1","g5d80b0","g5d80b1","g5d90b0",$
+;                "g5d90b1","g5d99b0","g5d99b1","g10d1b0","g10d1b1","g10d5b0","g10d5b1","g10d10b0","g10d10b1",$
+;                "g10d20b0","g10d20b1","g10d30b0","g10d30b1","g10d40b0","g10d40b1","g10d50b0","g10d50b1",$
+;                "g10d60b0","g10d60b1","g10d70b0","g10d70b1","g10d80b0","g10d80b1","g10d90b0","g10d90b1",$
+;                "g10d99b0","g10d99b1","g20d1b0","g20d1b1","g20d5b0","g20d5b1","g20d10b0","g20d10b1",$
+;                "g20d20b0","g20d20b1","g20d30b0","g20d30b1","g20d40b0","g20d40b1","g20d50b0","g20d50b1",$
+;                "g20d60b0","g20d60b1","g20d70b0","g20d70b1","g20d80b0","g20d80b1","g20d90b0","g20d90b1",$
+;                "g20d99b0","g20d99b1","g30d1b0","g30d1b1","g30d5b0","g30d5b1","g30d10b0","g30d10b1",$
+;                "g30d20b0","g30d20b1","g30d30b0","g30d30b1","g30d40b0","g30d40b1","g30d50b0","g30d50b1",$
+;                "g30d60b0","g30d60b1","g30d70b0","g30d70b1","g30d80b0","g30d80b1","g30d90b0","g30d90b1",$
+;                "g30d99b0","g30d99b1","g40d1b0","g40d1b1","g40d5b0","g40d5b1","g40d10b0","g40d10b1",$
+;                "g40d20b0","g40d20b1","g40d30b0","g40d30b1","g40d40b0","g40d40b1","g40d50b0","g40d50b1",$
+;                "g40d60b0","g40d60b1","g40d70b0","g40d70b1","g40d80b0","g40d80b1","g40d90b0","g40d90b1",$
+;                "g40d99b0","g40d99b1","g50d1b0","g50d1b1","g50d5b0","g50d5b1","g50d10b0","g50d10b1",$
+;                "g50d20b0","g50d20b1","g50d30b0","g50d30b1","g50d40b0","g50d40b1","g50d50b0","g50d50b1",$
+;                "g50d60b0","g50d60b1","g50d70b0","g50d70b1","g50d80b0","g50d80b1","g50d90b0","g50d90b1",$
+;                "g50d99b0","g50d99b1","g60d1b0","g60d1b1","g60d5b0","g60d5b1","g60d10b0","g60d10b1",$
+;                "g60d20b0","g60d20b1","g60d30b0","g60d30b1","g60d40b0","g60d40b1","g60d50b0","g60d50b1",$
+;                "g60d60b0","g60d60b1","g60d70b0","g60d70b1","g60d80b0","g60d80b1","g60d90b0","g60d90b1",$
+;                "g60d99b0","g60d99b1","g70d1b0","g70d1b1","g70d5b0","g70d5b1","g70d10b0","g70d10b1",$
+;                "g70d20b0","g70d20b1","g70d30b0","g70d30b1","g70d40b0","g70d40b1","g70d50b0","g70d50b1",$
+;                "g70d60b0","g70d60b1","g70d70b0","g70d70b1","g70d80b0","g70d80b1","g70d90b0","g70d90b1",$
+;                "g70d99b0","g70d99b1","g80d1b0","g80d1b1","g80d5b0","g80d5b1","g80d10b0","g80d10b1",$
+;                "g80d20b0","g80d20b1","g80d30b0","g80d30b1","g80d40b0","g80d40b1","g80d50b0","g80d50b1",$
+;                "g80d60b0","g80d60b1","g80d70b0","g80d70b1","g80d80b0","g80d80b1","g80d90b0","g80d90b1",$
+;                "g80d99b0","g80d99b1","g90d1b0","g90d1b1","g90d5b0","g90d5b1","g90d10b0","g90d10b1",$
+;                "g90d20b0","g90d20b1","g90d30b0","g90d30b1","g90d40b0","g90d40b1","g90d50b0","g90d50b1", $
+;                "g90d60b0","g90d60b1","g90d70b0","g90d70b1","g90d80b0","g90d80b1","g90d90b0","g90d90b1",$
+;                "g90d99b0","g90d99b1","g99d1b0","g99d1b1","g99d5b0","g99d5b1","g99d10b0","g99d10b1",$
+;                "g99d20b0","g99d20b1","g99d30b0","g99d30b1","g99d40b0","g99d40b1","g99d50b0","g99d50b1",$
+;                "g99d60b0","g99d60b1","g99d70b0","g99d70b1","g99d80b0","g99d80b1","g99d90b0","g99d90b1",$
+;                "g99d99b0","g99d99b1","g1g5b0","g1g5b1","g1g10b0","g1g10b1","g1g20b0","g1g20b1","g1g30b0",$
+;                "g1g30b1","g1g40b0","g1g40b1","g1g50b0","g1g50b1","g1g60b0","g1g60b1","g1g70b0","g1g70b1",$
+;                "g1g80b0","g1g80b1","g1g90b0","g1g90b1","g1g99b0","g1g99b1","g5g10b0","g5g10b1","g5g20b0",$
+;                "g5g20b1","g5g30b0","g5g30b1","g5g40b0","g5g40b1","g5g50b0","g5g50b1","g5g60b0","g5g60b1",$
+;                "g5g70b0","g5g70b1","g5g80b0","g5g80b1","g5g90b0","g5g90b1","g5g99b0","g5g99b1",$
+;                "g10g20b0","g10g20b1","g10g30b0","g10g30b1","g10g40b0","g10g40b1","g10g50b0","g10g50b1",$
+;                "g10g60b0","g10g60b1","g10g70b0","g10g70b1","g10g80b0","g10g80b1","g10g90b0","g10g90b1",$
+;                "g10g99b0","g10g99b1","g20g30b0","g20g30b1","g20g40b0","g20g40b1","g20g50b0","g20g50b1",$
+;                "g20g60b0","g20g60b1","g20g70b0","g20g70b1","g20g80b0","g20g80b1","g20g90b0","g20g90b1",$
+;                "g20g99b0","g20g99b1","g30g40b0","g30g40b1","g30g50b0","g30g50b1","g30g60b0","g30g60b1",$
+;                "g30g70b0","g30g70b1","g30g80b0","g30g80b1","g30g90b0","g30g90b1","g30g99b0","g30g99b1",$
+;                "g40g50b0","g40g50b1","g40g60b0","g40g60b1","g40g70b0","g40g70b1","g40g80b0","g40g80b1",$
+;                "g40g90b0","g40g90b1","g40g99b0","g40g99b1","g50g60b0","g50g60b1","g50g70b0","g50g70b1",$
+;                "g50g80b0","g50g80b1","g50g90b0","g50g90b1","g50g99b0","g50g99b1","g60g70b0","g60g70b1",$
+;                "g60g80b0","g60g80b1","g60g90b0","g60g90b1","g60g99b0","g60g99b1","g70g80b0","g70g80b1",$
+;                "g70g90b0","g70g90b1","g70g99b0","g70g99b1","g80g90b0","g80g90b1","g80g99b0","g80g99b1",$
+;                "g90g99b0","g90g99b1","d1d5b0","d1d5b1","d1d10b0","d1d10b1","d1d20b0","d1d20b1","d1d30b0",$
+;                "d1d30b1","d1d40b0","d1d40b1","d1d50b0","d1d50b1","d1d60b0","d1d60b1","d1d70b0","d1d70b1",$
+;                "d1d80b0","d1d80b1","d1d90b0","d1d90b1","d1d99b0","d1d99b1","d5d10b0","d5d10b1","d5d20b0",$
+;                "d5d20b1","d5d30b0","d5d30b1","d5d40b0","d5d40b1","d5d50b0","d5d50b1","d5d60b0","d5d60b1",$
+;                "d5d70b0","d5d70b1","d5d80b0","d5d80b1","d5d90b0","d5d90b1","d5d99b0","d5d99b1","d10d20b0",$
+;                "d10d20b1","d10d30b0","d10d30b1","d10d40b0","d10d40b1","d10d50b0","d10d50b1","d10d60b0","d10d60b1",$
+;                "d10d70b0","d10d70b1","d10d80b0","d10d80b1","d10d90b0","d10d90b1","d10d99b0","d10d99b1","d20d30b0",$
+;                "d20d30b1","d20d40b0","d20d40b1","d20d50b0","d20d50b1","d20d60b0","d20d60b1","d20d70b0","d20d70b1",$
+;                "d20d80b0","d20d80b1","d20d90b0","d20d90b1","d20d99b0","d20d99b1","d30d40b0","d30d40b1","d30d50b0",$
+;                "d30d50b1","d30d60b0","d30d60b1","d30d70b0","d30d70b1","d30d80b0","d30d80b1","d30d90b0","d30d90b1",$
+;                "d30d99b0","d30d99b1","d40d50b0","d40d50b1","d40d60b0","d40d60b1","d40d70b0","d40d70b1","d40d80b0",$
+;                "d40d80b1","d40d90b0","d40d90b1","d40d99b0","d40d99b1","d50d60b0","d50d60b1","d50d70b0","d50d70b1",$
+;                "d50d80b0","d50d80b1","d50d90b0","d50d90b1","d50d99b0","d50d99b1","d60d70b0","d60d70b1","d60d80b0",$
+;                "d60d80b1","d60d90b0","d60d90b1","d60d99b0","d60d99b1","d70d80b0","d70d80b1","d70d90b0","d70d90b1",$
+;                "d70d99b0","d70d99b1","d80d90b0","d80d90b1","d80d99b0","d80d99b1","d90d99b0","d90d99b1"]
+
+RETURN, 0
+END

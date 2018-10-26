@@ -1,0 +1,3 @@
+COMMON cb_prosail_data, skyl, data
+
+;Variables used to store PROSAIL base data to avoid reading the same variables again and again

@@ -1,0 +1,53 @@
+;rc=modifiedEXTREMA('max', cor, ind)
+
+Function modifiedEXTREMA, minmax, y, ind, n
+;ret code
+;0  : normal completion
+;10 : no 'min' or 'max' requested
+;30 : unrecognized data periodicity
+
+case minmax of
+  'min': ind=EXTREMA(y, /MIN_ONLY, NUMBER=n)
+  'max': ind=EXTREMA(y, /MAX_ONLY, NUMBER=n)
+  else: return, 10
+endcase
+;check that 
+;minima or maxima are 'big' enough and are not noise
+;Here, they have to be a max in 11 (hg*2+1) elements windows. It is assumed that a gs cannot be smaller than 10 decades
+;they are not at the lower or upper borders (when looking for minima in medyear, medyear is replicated 3 times
+;they have absolute values gt 0.1 (for maxima) and lt 0.8 for minima
+
+
+hw=5  ;half wing 
+if (n gt 1) then begin                  ;(if only one, just take it)
+  tmp_ind=INTARR(n)                     ;make an array to store good maxima
+  for k=0, n-1 do begin
+    ;check that it is not ath the borders
+    if ((ind[k] lt hw+1) OR (ind[k] gt (N_ELEMENTS(y)-hw-1)))  then begin
+      tmp_ind[k]=-99
+    endif else begin
+    case minmax of
+      'min': begin
+        if (y[ind[k]] LT MIN([[y[ind[k]-hw:ind[k]-1]],[y[ind[k]+1:ind[k]+hw]]])) $
+          AND (y[ind[k]] lt 0.8) then tmp_ind[k]=ind[k] else tmp_ind[k]=-99
+      end
+      'max': begin
+        if (y[ind[k]] GT MAX([[y[ind[k]-hw:ind[k]-1]],[y[ind[k]+1:ind[k]+hw]]])) $
+          AND (y[ind[k]] gt 0.1) then tmp_ind[k]=ind[k] else tmp_ind[k]=-99
+      end 
+      else: return, 10
+    endcase
+      
+    endelse 
+  endfor
+  t2=where(tmp_ind gt -1, counts)
+  if counts eq 0 then begin
+    ;unrecognized data periodicity
+    ind=-1
+    return, 30 
+  endif else begin
+    ind=tmp_ind[t2]
+  endelse
+endif
+return, 0
+End

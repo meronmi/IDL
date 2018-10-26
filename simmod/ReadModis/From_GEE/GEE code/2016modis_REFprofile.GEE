@@ -1,0 +1,54 @@
+//MODIS09A1_download
+//Mirco site
+var LonE  = -5.774639;
+var LatN = 39.940311;
+//Sudan
+//var LonE  = 30.4783;
+//var LatN = 13.2829;
+
+var place = ee.Feature.Point(LonE, LatN);
+
+//var studyarea = ee.Feature.Rectangle(LonE-0.1, LatN-0.1, LonE+0.1, LatN+0.1);
+
+// Get all MOD09A1 for the given time range
+var lta = ee.ImageCollection('MOD09A1').filterDate('2000-01-01', '2015-01-01').filterBounds(place.buffer(200));
+
+// Create empty list
+var l = ee.List([]);
+
+//print(l);
+
+// Iterate function to add feature to list
+function tmerge(f1, f2) {
+  return ee.List(f2).add(f1.sample(place, 10, 'EPSG:4326').set({'system:index': f1.id()}))
+}
+
+// Iterate over the MODIS collection -> creates a list of features
+var all = lta.iterate(tmerge, l)
+
+//print(all);
+
+var ft = ee.FeatureCollection(ee.List(all).flatten());
+
+print(ft.flatten());
+
+Export.table(ft.flatten(), 'profiles');
+
+// Get all images in the collection as an array
+//var images = lta.getInfo().features;
+
+// Display the first 3 in the map (note that the first one is empty (and not of 2001.01.01 but later)
+// Rach image is displayed as an RGB of 3 selected bands, approximately scaled between a min and max.
+//for (var i=0; i<3; i++) {
+//  Map.addLayer((ee.Image(images[i].id)).clip(studyarea), {bands: ['sur_refl_b04', 'sur_refl_b02','sur_refl_b01'], min: [1000, 2000, 1000], max: [2000, 4000, 3000]}, images[i].id);
+//}
+
+Map.addLayer(place, {}, 'mypoint')
+// Center the map
+Map.centerObject(place, 14);
+
+
+// Create a download task to get the third image. See "tasks" tab in UR window. NB: this will download to Google Drive or Google Map Engine!
+// Note that you have to select bands that have the same data type!! Here, I select 3, but you can add more.
+//exportImage(ee.Image(images[2].id).select('sur_refl_b04', 'sur_refl_b02','sur_refl_b01').clip(studyarea), "testDownload", {scale: 500, crs: 'EPSG:4326'});
+

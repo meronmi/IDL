@@ -1,0 +1,288 @@
+NAME:
+	README
+
+PURPOSE:
+	This file provides general information about the package, 
+	written with the C and Fortran90 languages, which implements 
+	the two-stream based radiation transfer model in 
+	heterogeneous vegetation canopies. An extension of the model 
+	for homogeneous canopies with preferred leaf normal distributions 
+	is also included (in 2stream).
+
+AUTHORS:
+	Thomas Lavergne and Bernard Pinty
+	Address: GVM Unit / IES / EC-Joint Research Centre
+	         Via E. Fermi 1
+		 21020 Ispra (VA)
+		 Italy
+
+	E-Mail:  Bernard Pinty   : bernard.pinty_AT_jrc.it
+	         Thomas Lavergne : thomas.lavergne_AT_jrc.it
+
+REFERENCES:
+	B. Pinty, T. Lavergne, R.E. Dickinson, J-L. Widlowski, N. Gobron and M. M. Verstraete (2005).
+	Simplifying the Interaction of Land Surfaces with Radiation for Relating Remote Sensing Products 
+	to Climate Models. Journal of Geophysical Research. in press.
+
+IMPORTANT PRELIMINARY COMMENT:
+	The 2stream package is build around three main program units, respectively implemented
+	in 2streams.c, Simple2stream.c and Simple2streamF.f90.
+	These program units use the same low-level equations (black background and black canopy terms)
+	as described in [Pinty et al. 2005]. The implementations of these low-level routines are
+	available in C and Fortran90 in sub-directories rad2s and rad2sf90, respectively.
+	
+	However, these 3 models are not intended for the same use:
+	1) 2streams.c (which is compiled as 2stream) is designed to be a command-line tool whose
+	   user-interface thoroughly checks for mis-uses and whose output format can be configured.
+	   It gives access to the radiative components as described in [Pinty et al. 2005]. Moreover,
+	   this program also implements the two-stream model for homogeneous canopies but with
+	   preferred leaf normal distributions (planophile, erectophile).
+	   
+	   |  This tool is intended as a) a demonstration/educational tool and b) a processing
+	   |  tool to be included in scripts.
+
+	2) Simple2stream.c (which is compiled as Simple2stream) and Simple2streamF.f90 (which is compiled 
+	   as Simple2streamF) are very similar except for the programming syntax. They are both designed 
+	   as minimalist models. Compared to 2streams.c, the same physics is embedded, except for the final 
+	   coupling equations. However, no user-interface is available, no checks are performed on the model 
+	   parameters and, finally, they do not give access to the intermediate calculation steps 
+	   (the radiative components). Both are build on loops over all input parameters to cover a large 
+	   range of conditions.
+	
+	   |  These tools are written to help and guide users who would want to include the two-stream
+	   |  model in bigger codes (e.g. GCMs, biosphere models,...) in C or Fortran.
+	   
+
+CONTENTS:
+	The 2stream package contains:
+
+	In the top-level directory:
+	===========================
+	README            
+		this file.
+
+	NEWS   
+		documents changes made to the package.
+
+        INSTALL
+		contains instructions to build and install the executables
+		of the package.
+
+	EXAMPLES
+		A text file to present and comment some examples to
+		properly use the 2stream software.
+
+	makefile
+		input file to the make tool to build the 2stream package.
+
+        In the srcC/ sub-directory:
+	===========================
+	2streams.c        
+		contains the main program unit which activates
+	        in turn the command line parser, the argument 
+		checker, the radiative transfer 2s model and 
+		eventually the output routines.
+
+	Simple2stream.c
+		contains an alternative main program unit which uses
+		a simpler and less user-friendly implementation of 
+		the two-stream model.
+		It is simpler in the sense that it is not possible
+		to access the various radiative components but only
+		the total albedo, transmission and absorption. Moreover,
+		no user interface is used: input parameters are browsed
+		along successive loops to cover several conditions.
+		
+	        This main program unit is written for those users who want
+		to ingest the two-stream model in bigger codes (e.g. GCMs)
+		and need hence a simpler routine/interface.
+
+        interf.c [.h]     
+		contains the routines in charge of parsing the
+	        command line options, checking the arguments 
+		given by the user as well as writting the model
+		results in a formatted string.
+
+	2streamsRTmodels.c [.h]
+	        defines the generic 2s model as the sum of several
+		radiation components ([Pinty et al. 2005]) as well
+		as its specific implementations (scattering orders,
+		leaf normal distribution, etc...)
+
+	gamma.c [.h]
+		implements the various gamma coefficients as well as 
+		the effective optical thickness to enter the 2s model.
+        
+	common.h
+	        defines some variables and macros used in several other
+		routines.
+        
+	In the srcF/ sub-directory:
+	===========================	
+	Simple2streamF.f
+		contains an alternative main program unit much similar
+		to Simple2stream.c
+
+	In the rad2s/ subdirectory:
+	===========================
+	Low-level radiation routines written in C. 
+		Refer to the README file in directory rad2s.
+		
+	In the rad2sf90/ subdirectory:
+	==============================
+	Low-level radiation routines written in Fortran90. 
+		Refer to the README file in directory rad2sf90.
+
+INSTALLATION:
+	Please refer to the INSTALL file included in the distribution.
+
+RUNNING THE PROGRAMS:
+	2stream:
+	========
+	1) DEFAULT EXECUTION
+	   A default execution of the 2stream is possible: just enters at
+	   the shell's prompt the command: 
+	   [:prompt:] ./bin/2stream
+	   The model will use default values for its arguments.
+	
+        2) NORMAL EXECUTION:
+           The 2stream executable  acts as a UNIX/Linux tool. In normal 
+	   configuration, 2stream takes its arguments from the command 
+	   line, checks they are valid, runs the 2s model and eventually 
+	   prints results on a single line (stdout). If an error occurs 
+	   during the processing or if the command line arguments cannot 
+	   be parsed, error and warning messages are issued on stderr. 
+	   EXIT_SUCCESS is the return code of 2stream if, and only if, 
+	   the execution went fine and the results are nominal. 
+	   EXIT_FAILURE is returned otherwise. These values usually 
+	   correspond to 0 and 1, respectively.
+
+        3) INPUTS and OUTPUTS:
+	   Inputs and ouputs to 2stream are described in the USAGE file 
+	   which is created at compile time. The -h flag to the 2stream 
+	   executable also prints this information. This usage message
+	   is re-produced at the end of this document (in the USING
+	   section) for user's convenience.
+	   Note, however, that this section does not act as a reference 
+	   and that the message displayed via the -h flag will usually
+	   be more up-to-date.
+	
+	Simple2stream and Simple2streamF:
+	=================================
+	1) EXECUTION:
+	   Both programs are written as loops on the model's input parameters
+	   and hence take no parameters from the command line:
+	   [:prompt:] ./bin/Simple2stream
+	   [:prompt:] ./bin/Simple2streamF
+
+        2) OUTPUTS:
+	   A little more than 2000 input parameters values are used and the
+	   resulting fluxes (purely colllimated and isotropic sources) are 
+	   written on as many lines on stdout.
+	
+USING:
+######################################################################################
+Two-stream model for heterogeneous vegetation canopy. Version 2.4
+
+Reference: "Symplifying the Interaction of Land Surfaces with Radiation for Relating Remote Sensing Products 
+to Climate Models", Pinty et al. (2005), Journal of Geophysical Research (JGR), in press.
+
+All flags can appear in no specified order on the command line.
+GENERAL FLAGS
+	-h
+		Displays this message and exits
+	-v
+		Displays the software's version number and exits
+	-o format_string
+		Use format_string to select the radiative quantities
+		to be displayed as output. This is not compatible with the -A flag.
+	-A
+		Display the whole set of resulting radiative quantities. This is not compatible with the -o flag.
+	-O
+		(capital o) Display a line composed of the columns' tags and index.
+	For both -o and -A, refer to section OUTPUT FORMAT.
+
+TWO-STREAM MODEL
+	The first three models are intended to calculate the radiative fluxes in heterogeneous vegetation
+	canopies by using effective variable values:
+	--full
+		Selects the generic model in [Pinty et al. 2005] with all orders of scattering activated.
+	--dble
+		Selects a model with only the first and second orders of vegetation scattering activated.
+	--sgle
+		Selects a model with only the first order of vegetation scattering activated (single scattering).
+
+	To choose a model is optional. The default is to use the full model.
+
+	The following three models are intended to calculate the radiative fluxes in homogeneous vegetation
+	canopies but with different leaf normal distributions (LND):
+	--spher
+		Models a homogeneous canopy with a spherical LND.
+	--plano
+		Models a homogeneous canopy with a planophile LND (mostly horizontal leaves).
+	--erecto
+		Models a homogeneous canopy with an erectophile LND (mostly vertical leaves).
+
+ILLUMINATION
+	The model calculates the radiative fluxes in two illumination geometry, namely collimated source
+	and isotropic source. The fraction of diffuse to total downward flux f_diff can be specified. A weighting
+	is applied between the outputs in the two illumination conditions to yields the resulting fluxes:
+			Flux(tot) = (1 - f_diff)*Flux(collimated) + f_diff*Flux(isotropic)
+	-s illu   : Describe the illumination geometry. If illu is a numerical value, it is the zenith angle of the
+		collimated source. Unit is degrees and it must be in ]-90,90[. However, if illu is the keyword "iso"
+		(quotes removed), it indicates that the source is purely diffuse (f_diff is implied to 1.0)
+	-F f_diff   : set the fraction of diffuse to total downward flux. If no -F flag is used, the illumination is
+		either purely collimated or purely isotropic, depending on the -s flag. f_diff is a numerical value that
+		must be in ]0,1[. The -F flag can only be used if -s is present and is given a numerical value.
+
+VEGETATION AND BACKGROUND DESCRIPTION PARAMETERS
+	-l lai     : Set the True Leaf Area Index of the canopy <LAI>. Must be > 0.
+	The Structure factors zeta and zeta* multiply <LAI> to yield the effective value of LAI.
+	-z  zeta      : Structure factor zeta. Must be > 0.
+	-z* zeta_star : Mean Structure factor zeta_star. Must be > 0.
+		If both are unset, the canopy is homogeneous: zeta=zeta_star=1.
+		If only one is set, both zeta and zeta_star are set to the given value.
+	-g rg      : Set the background reflectance. Must be in [0,1]. If the flag is omitted, the background
+		reflectance defaults to 0 (black background model).
+	The effective value for the leaf Reflectance and Transmittance can be set using 2 (and no more than 2) of:
+	-r rl      : Set the effective leaf Reflectance. Must be in [0,1[
+	-t tl      : Set the effective leaf Transmittance. Must be in [0,1[.
+	-w wl      : Set the effective leaf single scattering albedo. wl=rl+tl. Must be in [0,1[.
+	-d dl      : Set the effective leaf forward-scattering efficiency. dl = rl/tl. Must be > 0.
+
+OUTPUT FORMAT (issued on stdout only if the model completes the calculations).
+	The results are all displayed on one line. The first 8 columns are a remainder
+	of the input parameters to the program, in the following order.
+	 (1) sun     : Sun zenith angle in degrees. (if the illumination is purely diffuse: a non-value)
+	 (2) fdiff   : fraction of diffuse downward radiation.
+	 (3) <lai>   : True Lai of the canopy.
+	 (4) zeta    : Structure factor of the canopy for this Sun angle.
+	 (5) zeta*   : Mean Structure factor of the canopy.
+	 (6) rbgd    : Background reflectance.
+	 (7) rleaf   : Leaf reflectance (effective value).
+	 (8) tleaf   : Leaf transmittance (effective value).
+	The results of the calculations are then displayed on the same line. Some (and their relative order)
+	of these values can be choosen via the -o format_string sequence. format_string is a list of space (or comma)
+	separated tokens, all of which composed of the % (percent) character immediatly followed by a multi-character
+	identifier (e.g. %Ttot). These tokens are now listed. If no -o flag is specified, the output is the same
+	as if the sequence -o "%Alb,%Abs,%Tran" had been specified. Alternatively, the -A flag makes all the
+	following radiative fluxes to be displayed, in this order:
+	( 9) %Alb      Total Albedo.
+	(10) %Abs      Total Absorption by the vegetation canopy.
+	(11) %Tran     Total Transmission to the background level.
+	(12) %Alb_t1   Albedo accounting for the Black Background component.
+	(13) %Alb_t2   Albedo accounting for the Black Canopy component.
+	(14) %Alb_t3   Albedo accounting for the coupled canopy-background term.
+	(15) %Abs_t1   Absorption by the vegetation for the Black Background component.
+	(16) %Abs_t3   Absorption by the vegetation for the coupled canopy-background term.
+	(17) %Tran_t1  Transmission to the background level for the Black Background conponent.
+			It only accounts for the radiation collided by the vegetation.
+	(18) %Tran_t2  Transmission to the background level for the Black Canopy conponent.
+			This is the direct transmission through the layer.
+	(19) %Tran_t3  Transmission to the background level for the coupled canopy-background term.
+	(20) %Rbgd1    Albedo accounting for the radiation having hit only once the background (whether collided
+			or not by the vegetation, whether upward or downward).
+
+NOTE
+	Except for -z and -z*, only the first letter of the flag is parsed
+	so that -t -tl -trans -tta are all equivalent.

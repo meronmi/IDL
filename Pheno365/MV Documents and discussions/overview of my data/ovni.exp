@@ -1,0 +1,5 @@
+ENVI EXPRESSIONS
+(0.37598*float(b2)-0.50132*float(b1)+0.01091)/((-0.17150-float(b1))^2+(0.29464-float(b2))^2+0.11009)
+(float(b2)-float(b1))/(float(b2)+float(b1))
+float(b1)*0.333333
+float(b1)*0.25

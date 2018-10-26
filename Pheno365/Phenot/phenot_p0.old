@@ -1,0 +1,55 @@
+FUNCTION phenot_p0
+
+;  Purpose:
+;     To configure the phenot software package for a particular site.
+
+;  Outcome:
+;     The computing environment is set and the tasks to perform are defined.
+
+;  Usage:
+;     rc = phenot_p0()
+
+;  Input parameters: None.
+
+;  Output parameters: None.
+
+;  Return values:
+;     0: Normal completion.
+
+;  History:
+;     Version 1.0: This routine is an updated version of 'gs6t_p0.pro',
+;        ported to IDL 7.0 on 23 September 2008.
+;     Version 1.1: Port under Suse Linux (starting February 2010).
+
+;  Include the necessary common block(s):
+@cb_os.comm
+@cb_job.comm
+
+;  Initialize the return code:
+retcode = 0
+
+;  Identify the current OS family (IDL recognizes only two families, namely
+;  'unix' and 'windows'):
+platform = !version.os_family
+
+;  Set the screen device and the directory separator:
+IF (platform EQ 'unix') THEN BEGIN
+   screen = 'X'
+   dirsep = '/'
+ENDIF ELSE BEGIN
+   screen = 'Win'
+   dirsep = '\'
+ENDELSE
+
+;  Read the initialization file for the current run and reuse the return
+;  code of phenot_p0_job:
+rc = phenot_p0_job()
+retcode = rc
+
+;  Report the outcome of Phase 0:
+PRINT, '*** phenot_p0.pro [INFO]: Completed Phase 0.'
+PRINT
+
+RETURN, retcode
+
+END

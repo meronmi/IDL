@@ -1,0 +1,10 @@
+        !COMPILER-GENERATED INTERFACE MODULE: Mon Jun 07 15:50:12 2010
+        MODULE TAV_ABS__genmod
+          INTERFACE 
+            SUBROUTINE TAV_ABS(TETA,REFR,RES)
+              REAL(KIND=8), INTENT(IN) :: TETA
+              REAL(KIND=8), INTENT(IN) :: REFR(2101)
+              REAL(KIND=8), INTENT(OUT) :: RES(2101)
+            END SUBROUTINE TAV_ABS
+          END INTERFACE 
+        END MODULE TAV_ABS__genmod

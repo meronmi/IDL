@@ -1,0 +1,214 @@
+PRO align_seasos_of_year_by_year_pheno
+;treat the case of bimodal season (when in monomodal years we do not know if s1 is with s1 or s2 of bimodal)
+;goal: make new images of ['s','m','e','l','ym'] with consisten s1 and s2 (that is, in s1 I always find s1)
+
+hour_in_sec = 60L*60
+;WAIT, 4*hour_in_sec
+
+valSupuppressedSeason = 200     ;everything suppressed because there were 1 to 3 bimodal only. So, it is not mono but we can't understand the seasonality
+valUnusable = 201               ;the two seasons are too close we cannot set a break          
+valMoved = 202                  ;the value has been moved from s1 to s2
+valReMoved = 203                ;the value is suppressed because was falling on the breakpoint
+;here below all at 254 because ym is using values up to 250
+valSupuppressedSeason4ym = 254
+valUnusable4ym = 254
+valMoved4ym = 254
+valReMoved4ym = 254
+
+cPixWithSeasonMoved = 0UL
+cPixWithSeasonRemoved  = 0UL
+
+dir = '\\ies\d5\asap\Pheno_year_by_year\Pheno\'
+
+
+fns = CREATE_STRUCT('k',dir + 'BBB_' +'kk0','s',dir + 'BBB_' +'s','m',dir + 'BBB_' +'m','e',dir + 'BBB_' +'e','l',dir + 'BBB_' +'l','y',dir + 'BBB_' +'ym')
+;the final filename for season 1 will be: fns.s+'1.bil' 
+
+ns = LONG(read_info('samples', dir + '\' + FILE_BASENAME(fns.k, '.bil')+'.hdr'))
+nl = LONG(read_info('lines', dir + '\' + FILE_BASENAME(fns.k, '.bil')+'.hdr'))
+nb = LONG(read_info('bands', dir + '\' + FILE_BASENAME(fns.k, '.bil')+'.hdr'))
+mapinfo = read_info('map info',  dir + '\' + FILE_BASENAME(fns.k, '.bil')+'.hdr')
+dt = 1
+
+OPENR, lunk, fns.k+'.bil' , /GET_LUN
+OPENR, luns1, fns.s+'1.bil' , /GET_LUN
+OPENR, luns2, fns.s+'2.bil' , /GET_LUN
+OPENR, lunm1, fns.m+'1.bil' , /GET_LUN
+OPENR, lunm2, fns.m+'2.bil' , /GET_LUN
+OPENR, lune1, fns.e+'1.bil' , /GET_LUN
+OPENR, lune2, fns.e+'2.bil' , /GET_LUN
+OPENR, lunl1, fns.l+'1.bil' , /GET_LUN
+OPENR, lunl2, fns.l+'2.bil' , /GET_LUN
+OPENR, luny1, fns.y+'1.bil' , /GET_LUN
+OPENR, luny2, fns.y+'2.bil' , /GET_LUN
+
+OPENW, luns1w, fns.s+'_adj_'+'1.bil' , /GET_LUN
+OPENW, luns2w, fns.s+'_adj_'+'2.bil' , /GET_LUN
+OPENW, lunm1w, fns.m+'_adj_'+'1.bil' , /GET_LUN
+OPENW, lunm2w, fns.m+'_adj_'+'2.bil' , /GET_LUN
+OPENW, lune1w, fns.e+'_adj_'+'1.bil' , /GET_LUN
+OPENW, lune2w, fns.e+'_adj_'+'2.bil' , /GET_LUN
+OPENW, lunl1w, fns.l+'_adj_'+'1.bil' , /GET_LUN
+OPENW, lunl2w, fns.l+'_adj_'+'2.bil' , /GET_LUN
+OPENW, luny1w, fns.y+'_adj_'+'1.bil' , /GET_LUN
+OPENW, luny2w, fns.y+'_adj_'+'2.bil' , /GET_LUN
+
+;assoc liens l..
+lk = ASSOC(lunk, MAKE_ARRAY(ns, nb, TYPE = dt))
+ls1 = ASSOC(luns1, MAKE_ARRAY(ns, nb, TYPE = dt))
+ls2 = ASSOC(luns2, MAKE_ARRAY(ns, nb, TYPE = dt))
+lm1 = ASSOC(lunm1, MAKE_ARRAY(ns, nb, TYPE = dt))
+lm2 = ASSOC(lunm2, MAKE_ARRAY(ns, nb, TYPE = dt))
+le1 = ASSOC(lune1, MAKE_ARRAY(ns, nb, TYPE = dt))
+le2 = ASSOC(lune2, MAKE_ARRAY(ns, nb, TYPE = dt))
+ll1 = ASSOC(lunl1, MAKE_ARRAY(ns, nb, TYPE = dt))
+ll2 = ASSOC(lunl2, MAKE_ARRAY(ns, nb, TYPE = dt))
+ly1 = ASSOC(luny1, MAKE_ARRAY(ns, nb, TYPE = dt))
+ly2 = ASSOC(luny2, MAKE_ARRAY(ns, nb, TYPE = dt))
+
+FOR i = 0, nl-1 DO BEGIN
+   IF ((i MOD 1000.0) EQ 0) THEN PRINT, i  
+   k = lk[i]
+   ;nbi is the number of bimodal  
+   ind = WHERE((k GE 200) AND (k LT 250), count)
+   bimodalMask = k * 0
+   bimodalMask[ind] = 1
+   nbi = TOTAL(bimodalMask, 2) 
+   ;I have to act only on those having nb GE 1 and nb LT 14 (if they are all be modal, do nothing
+   ;get the index of partially bimodal
+   indPartBi = WHERE((nbi GT 0) AND (nbi LT nb), countPartBi) 
+   s1=ls1[i]
+   s2=ls2[i] 
+   m1=lm1[i] 
+   m2=lm2[i] 
+   e1=le1[i] 
+   e2=le2[i] 
+   l1=ll1[i]
+   l2=ll2[i]
+   y1=ly1[i]
+   y2=ly2[i]
+   ;modify only those
+   ;*********************************************
+   IF (countPartBi GT 0) THEN BEGIN
+    FOR j = 0, countPartBi -1 DO BEGIN
+      sample=indPartBi[j]
+      CASE (nbi[sample] LT 4) OF
+        1: BEGIN
+          ;less that for 4 years with bi-modality, discard the bimodal years
+          s2[sample,*] = valSupuppressedSeason
+          m2[sample,*] = valSupuppressedSeason
+          e2[sample,*] = valSupuppressedSeason
+          l2[sample,*] = valSupuppressedSeason
+          y2[sample,*] = valSupuppressedSeason4ym 
+        END
+        0: BEGIN
+          ;more thn for 4 years with bi-modality, use this year fo attribute the mono to the correct season
+          ;get tom of s1 and s2
+          ind = WHERE(bimodalMask[sample,*] EQ 1)
+          m_s1 = FLOAT(m1[sample,ind])
+          indNaN = WHERE(m_s1 GE 251, countNaN)
+          IF (countNaN GT 0) THEN m_s1[indNaN] = !VALUES.F_NAN
+          m_s2 = FLOAT(m2[sample,ind])
+          indNaN = WHERE(m_s2 GE 251, countNaN)
+          IF (countNaN GT 0) THEN m_s2[indNaN] = !VALUES.F_NAN
+          ;compute break point (before is s1, after is s2)
+          ;distance between maximum first and minimum second
+          dist = MIN(m_s2, /NAN) - MAX(m_s1, /NAN)
+          IF (dist GT 2) THEN BEGIN
+            brkPnt = MAX(m_s1, /NAN) + dist/2.0
+            ;now find the monomodal that are present, and are after the break and should be moved to s2
+            indSeas1toMove = WHERE(((bimodalMask[sample,*] EQ 0) $              ;potentially monomodal
+                          AND (m1[sample,*] LE 108) $                 ;monomodal and present
+                          AND (m1[sample,*] GT brkPnt)), count2move)       ;after the break (so in line with s2
+            ;now find the monomodal that are present, and are on the break and should be removed because we can say if it is s1 or s2
+            indSeas1toRemove = WHERE(((bimodalMask[sample,*] EQ 0) $              ;potentially monomodal
+                          AND (m1[sample,*] LE 108) $                 ;monomodal and present
+                          AND (m1[sample,*] EQ brkPnt)), count2remove)       ;after the break (so in line with s2
+            ;now assign and remove
+            IF (count2move GT 0) THEN BEGIN
+              s2[sample,indSeas1toMove] = s1[sample,indSeas1toMove] & s1[sample,indSeas1toMove] = valMoved 
+              m2[sample,indSeas1toMove] = m1[sample,indSeas1toMove] & m1[sample,indSeas1toMove] = valMoved
+              e2[sample,indSeas1toMove] = e1[sample,indSeas1toMove] & e1[sample,indSeas1toMove] = valMoved
+              l2[sample,indSeas1toMove] = l1[sample,indSeas1toMove] & l1[sample,indSeas1toMove] = valMoved
+              y2[sample,indSeas1toMove] = y1[sample,indSeas1toMove] & y1[sample,indSeas1toMove] = valMoved4ym 
+              cPixWithSeasonMoved  = cPixWithSeasonMoved  + 1
+            ENDIF
+            
+            IF (count2remove GT 0) THEN BEGIN
+              s1[sample,indSeas1toRemove] = valReMoved 
+              m1[sample,indSeas1toRemove] = valReMoved 
+              e1[sample,indSeas1toRemove] = valReMoved 
+              l1[sample,indSeas1toRemove] = valReMoved 
+              y1[sample,indSeas1toRemove] = valReMoved4ym 
+              cPixWithSeasonRemoved  = cPixWithSeasonRemoved  + 1
+            ENDIF
+          ENDIF ELSE BEGIN
+            ;flag it unusable
+            s1[sample,*] = valUnusable 
+            m1[sample,*] = valUnusable 
+            e1[sample,*] = valUnusable 
+            l1[sample,*] = valUnusable 
+            y1[sample,*] = valUnusable4ym 
+            s2[sample,*] = valUnusable 
+            m2[sample,*] = valUnusable 
+            e2[sample,*] = valUnusable 
+            l2[sample,*] = valUnusable 
+            y2[sample,*] = valUnusable4ym           
+          ENDELSE  
+        END
+      ENDCASE 
+    ENDFOR
+   ENDIF
+   ;*********************************************
+   WRITEU, luns1w, s1
+   WRITEU, luns2w, s2
+   WRITEU, lunm1w, m1
+   WRITEU, lunm2w, m2
+   WRITEU, lune1w, e1
+   WRITEU, lune2w, e2
+   WRITEU, lunl1w, l1
+   WRITEU, lunl2w, l2
+   WRITEU, luny1w, y1
+   WRITEU, luny2w, y2
+   
+ENDFOR
+
+
+PRINT, 'cPixWithSeasonMoved = ', STRTRIM(cPixWithSeasonMoved ,2)
+PRINT, 'cPixWithSeasonRemoved  = ', STRTRIM(cPixWithSeasonRemoved  ,2)
+FREE_LUN, lunk
+FREE_LUN, luns1
+FREE_LUN, luns2
+FREE_LUN, lunm1
+FREE_LUN, lunm2
+FREE_LUN, lune1
+FREE_LUN, lune2
+FREE_LUN, lunl1
+FREE_LUN, lunl2
+FREE_LUN, luny1
+FREE_LUN, luny2
+
+FREE_LUN, luns1w
+FREE_LUN, luns2w
+FREE_LUN, lunm1w
+FREE_LUN, lunm2w
+FREE_LUN, lune1w
+FREE_LUN, lune2w
+FREE_LUN, lunl1w
+FREE_LUN, lunl2w
+FREE_LUN, luny1w
+FREE_LUN, luny2w
+
+res = write_envi_hdr(fns.s+'_adj_'+'1.hdr', ns, nl, 1, NBANDS=nb, INTERLEAVE='bil', MAPINFO=mapinfo)
+res = write_envi_hdr(fns.s+'_adj_'+'2.hdr', ns, nl, 1, NBANDS=nb, INTERLEAVE='bil', MAPINFO=mapinfo)
+res = write_envi_hdr(fns.m+'_adj_'+'1.hdr', ns, nl, 1, NBANDS=nb, INTERLEAVE='bil', MAPINFO=mapinfo)
+res = write_envi_hdr(fns.m+'_adj_'+'2.hdr', ns, nl, 1, NBANDS=nb, INTERLEAVE='bil', MAPINFO=mapinfo)
+res = write_envi_hdr(fns.e+'_adj_'+'1.hdr', ns, nl, 1, NBANDS=nb, INTERLEAVE='bil', MAPINFO=mapinfo)
+res = write_envi_hdr(fns.e+'_adj_'+'2.hdr', ns, nl, 1, NBANDS=nb, INTERLEAVE='bil', MAPINFO=mapinfo)
+res = write_envi_hdr(fns.l+'_adj_'+'1.hdr', ns, nl, 1, NBANDS=nb, INTERLEAVE='bil', MAPINFO=mapinfo)
+res = write_envi_hdr(fns.l+'_adj_'+'2.hdr', ns, nl, 1, NBANDS=nb, INTERLEAVE='bil', MAPINFO=mapinfo)
+res = write_envi_hdr(fns.y+'_adj_'+'1.hdr', ns, nl, 1, NBANDS=nb, INTERLEAVE='bil', MAPINFO=mapinfo)
+res = write_envi_hdr(fns.y+'_adj_'+'2.hdr', ns, nl, 1, NBANDS=nb, INTERLEAVE='bil', MAPINFO=mapinfo)
+
+
+END

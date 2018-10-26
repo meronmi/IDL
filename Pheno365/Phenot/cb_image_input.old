@@ -1,0 +1,1 @@
+COMMON cb_image_input, path, filein, ns, nl, nb, fst_dek, first_year, last_year, julian1_f, mask, fileAcqJulDay

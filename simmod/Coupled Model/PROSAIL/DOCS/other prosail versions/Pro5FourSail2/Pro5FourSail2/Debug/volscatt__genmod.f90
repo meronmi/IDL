@@ -1,0 +1,15 @@
+        !COMPILER-GENERATED INTERFACE MODULE: Mon Jun 07 15:50:12 2010
+        MODULE VOLSCATT__genmod
+          INTERFACE 
+            SUBROUTINE VOLSCATT(TTS,TTO,PSI,TTL,CHI_S,CHI_O,FRHO,FTAU)
+              REAL(KIND=8), INTENT(IN) :: TTS
+              REAL(KIND=8), INTENT(IN) :: TTO
+              REAL(KIND=8), INTENT(IN) :: PSI
+              REAL(KIND=8), INTENT(IN) :: TTL
+              REAL(KIND=8), INTENT(INOUT) :: CHI_S
+              REAL(KIND=8), INTENT(INOUT) :: CHI_O
+              REAL(KIND=8), INTENT(INOUT) :: FRHO
+              REAL(KIND=8), INTENT(INOUT) :: FTAU
+            END SUBROUTINE VOLSCATT
+          END INTERFACE 
+        END MODULE VOLSCATT__genmod

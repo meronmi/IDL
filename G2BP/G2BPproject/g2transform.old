@@ -1,0 +1,79 @@
+PRO G2transform
+;1. INSTALL FWTOOLS 
+;http://fwtools.maptools.org/
+;2. place the 7za.exe in a folder you like
+;3. set the two dierectory below and run this procedure
+;4. as a result you'll find several NDVI tiff files
+;###########################################################################
+;SET PATH of UNZIPPER
+path_zipexe='X:\G2\FULL_ARCHIVE\NDVI Tunisia'
+;SET PATH of G2 data (zip files)
+;path_data='X:\G2\FULL_ARCHIVE\NDVI Tunisia\H19V05'
+path_data='X:\G2\FULL_ARCHIVE\NDVI Tunisia\fAPAR\2011_VITO\fAPAR\H19V05';'X:\G2\FULL_ARCHIVE\BP V1.2 niger examples\fapar'
+
+;###########################################################################
+
+;UNZIP
+;CD, path_data
+;list=FILE_SEARCH('*.gz')
+;IF N_ELEMENTS(list) EQ 1 THEN list=FILE_SEARCH('*.zip')
+;FILE_COPY, path_zipexe + '\7za.exe', path_data + '\7za.exe', /OVERWRITE
+;
+;FOR i=0, N_ELEMENTS(list)-1 DO BEGIN
+;  SPAWN, '7za e '+list[i], /LOG_OUTPUT
+;ENDFOR
+;FILE_DELETE, path_data + '\7za.exe', /QUIET
+
+;CONVERT h5 TO TIFF
+list=FILE_SEARCH(path_data+'\*.h5')
+batname='converth5.bat'
+OPENW, lun, path_data+'\'+batname, /GET_LUN
+str1='SET FWTOOLS_DIR=C:\PROGRA~2\FWTOOL~1.7'
+str2='call "%FWTOOLS_DIR%\bin\setfwenv.bat"'
+
+
+PRINTF, lun, str1
+PRINTF, lun, str2
+PRINT, list
+FOR i=0, N_ELEMENTS(list)-1 DO BEGIN
+  PRINTF, lun, 'gdal_translate -sds "'+list[i]+'" "'+list[i]+'.tif"'
+ENDFOR
+FREE_LUN, lun
+CD, path_data
+SPAWN, batname, /LOG_OUTPUT
+
+CD, path_data
+FOR i=0, N_ELEMENTS(list)-1 DO BEGIN
+  FILE_DELETE, list[i], /QUIET
+ENDFOR
+
+;list=FILE_SEARCH('*.tif1')   ;for NDVI
+list=FILE_SEARCH('*.tif2')    ;for fAPAR
+FOR i=0, N_ELEMENTS(list)-1 DO BEGIN
+  FILE_DELETE, path_data + '\' + list[i], /QUIET
+ENDFOR
+list=FILE_SEARCH('*.tif3')
+FOR i=0, N_ELEMENTS(list)-1 DO BEGIN
+  FILE_DELETE, path_data + '\' + list[i], /QUIET
+ENDFOR
+list=FILE_SEARCH('*.tif4')
+FOR i=0, N_ELEMENTS(list)-1 DO BEGIN
+  FILE_DELETE, path_data + '\' + list[i], /QUIET
+ENDFOR
+list=FILE_SEARCH('*.tif5')
+FOR i=0, N_ELEMENTS(list)-1 DO BEGIN
+  FILE_DELETE, path_data + '\' + list[i], /QUIET
+ENDFOR
+;list=FILE_SEARCH('*.tif2') ;NDVI
+;list_base=FILE_BASENAME(list , 'tif2')
+;FOR i=0, N_ELEMENTS(list)-1 DO BEGIN
+;  FILE_MOVE, path_data + '\' + list[i], path_data + '\' + list_base[i] + '.tif'
+;ENDFOR
+list=FILE_SEARCH('*.tif1')  ;fAPAR
+list_base=FILE_BASENAME(list , 'tif1')
+FOR i=0, N_ELEMENTS(list)-1 DO BEGIN
+  FILE_MOVE, path_data + '\' + list[i], path_data + '\' + list_base[i] + '.tif'
+ENDFOR
+
+PRINT, 'Task terminated'
+END

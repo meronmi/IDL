@@ -1,0 +1,105 @@
+PRO RUN_BBB_regXY
+dirY = '\\ies\d5\asap\TEST_PREDICTORS\DATA_Y\cNDVI'
+varNameY = 'zcNDVI_200701-201714'
+out_dir = '\\ies\d5\asap\TEST_PREDICTORS\YX_correlation'
+dirX = '\\ies\d5\asap\TEST_PREDICTORS\DATA_X\Indicator_at_progress'  
+;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PUT THEM ALL
+varNameX = ['zBECsm'];['SPI1'];, 'SPI3']
+;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+progNameX = ['_atProg0','_atProg25','_atProg50','_atProg75','_atProg100'] + '_bil'
+fnTmp = dirY + '\season' + STRTRIM(1,2) + varNameY 
+ns = FIX(read_info('samples', fnTmp + '.hdr'))
+nl = FIX(read_info('lines', fnTmp + '.hdr'))
+nb = FIX(read_info('bands', fnTmp + '.hdr'))
+mapinfo_string = read_info('map info', fnTmp + '.hdr')
+coord_string = read_info('coordinate system string', fnTmp + '.hdr')
+
+FOR v = 0, N_ELEMENTS(varNameX) - 1 DO BEGIN
+  FOR s = 1, 2 DO BEGIN
+    FOR p = 0, N_ELEMENTS(progNameX) - 1 DO BEGIN
+      ;fnX = dirX + '\season' + STRTRIM(s,2) +  varNameX[v] + progNameX[p] 
+      ;fnY = dirY + '\season' + STRTRIM(s,2) + varNameY
+      fnX = 'season' + STRTRIM(s,2) +  varNameX[v] + progNameX[p]
+      fnY = 'season' + STRTRIM(s,2) + varNameY
+      BBB_regXY, dirX, fnX, dirY, fnY, ns, nl, nb, out_dir, mapinfo_string, coord_string
+    ENDFOR
+  ENDFOR
+ENDFOR  
+END
+
+
+PRO BBB_regXY, dirX, fnX, dirY, fnY, ns, nl, nb, out_dir, mapinfo_string, coord_string
+;compute per pixel r^2, b and significance of two stack images over two seasons (separately and then toghether)
+X = FLTARR(ns,nl, nb)
+Y = X
+corr = FLTARR(ns,nl)*!VALUES.F_NAN
+cod = FLTARR(ns,nl)*!VALUES.F_NAN ;coefficient of determination
+b = FLTARR(ns,nl)*!VALUES.F_NAN ;slope
+p =  FLTARR(ns,nl)*!VALUES.F_NAN
+
+;X files are bil
+OPENR, lunX, dirX + '\' + fnX, /GET_LUN
+lineX = ASSOC(lunX, FLTARR(ns, nb))
+
+;Y is bsq
+OPENR, lunY, dirY + '\' + fnY, /GET_LUN
+READU, lunY, Y
+FREE_LUN, lunY
+
+;variables to store all values and plot correlation
+xarr = [!NULL]
+yarr = [!NULL]
+
+FOR l=0, nl-1 DO BEGIN
+  X = lineX[l]
+  IF ((l MOD 100) EQ 0) THEN PRINT, fnX + ', Reading Line: ' + STRTRIM(l)
+  FOR s = 0, ns-1 DO BEGIN
+    xp = X[s,*]
+    yp = Y[s,l,*]
+    indFin = WHERE((FINITE(xp)) AND (FINITE(yp)), countFin)
+    IF (countFin GE 4) THEN BEGIN
+      res = linregstat(xp[indFin], yp[indFin])
+      ; RETURN, [offset, gain, corr, pgain]
+      cod[s,l] = res[2]^2
+      b[s,l] = res[1]
+      corr[s,l] = res[2]
+      p[s,l] = res[3]
+      xarr = [xarr, xp[indFin]]
+      yarr = [yarr, yp[indFin]]
+    ENDIF
+  ENDFOR
+ENDFOR
+FREE_LUN, lunX
+
+suffixes = ['-corr_with-zcNDVI', '-cod_with-zcNDVI', '-gain_with-zcNDVI', '-p_with-zcNDVI']
+
+OPENW, lun, out_dir + '\' + fnX + suffixes[0], /GET_LUN
+WRITEU, lun, corr
+FREE_LUN, lun
+
+OPENW, lun, out_dir + '\' + fnX + suffixes[1], /GET_LUN
+WRITEU, lun, cod
+FREE_LUN, lun
+
+OPENW, lun, out_dir + '\' + fnX + suffixes[2], /GET_LUN
+WRITEU, lun, b
+FREE_LUN, lun
+
+OPENW, lun, out_dir + '\' + fnX + suffixes[3], /GET_LUN
+WRITEU, lun, p
+FREE_LUN, lun
+
+;write the hdrs
+FOR i = 0, N_ELEMENTS(suffixes)-1 DO $
+  res = write_envi_hdr(out_dir + '\' + fnX + suffixes[i] + '.hdr', ns, nl, 4, NBANDS=1, INTERLEAVE='bsq', MAPINFO=mapinfo_string, COORDINFO=coord_string)
+
+SAVE, /ALL, FILENAME = out_dir + '\buttami.sav'
+h2d = HIST_2D(xarr, yarr_band, bin1=0.05, bin2=0.05)
+ct = COLORTABLE(25);, /REVERSE)
+g0 = IMAGE(h2d, RGB_TABLE=ct, AXIS_STYLE=2, MARGIN=0.1, $
+  XTITLE=fnX, YTITLE='czNDVI')
+g0.save, out_dir + '\' + fnX + '_scatterplot.png', BORDER=10, RESOLUTION=300, /TRANSPARENT
+PRINT, 'BBB_regXY finished'
+
+
+END

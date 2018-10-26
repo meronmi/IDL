@@ -1,0 +1,216 @@
+FUNCTION phenot_p3_strt
+
+;  Purpose:
+;     To detect the first time the smoothed FAPAR values increase from
+;     under the median of the entire FAPAR record to above this value.
+;     Rationale:
+;     - Satellite sensors start operating at arbitrary times with
+;       respect to growing seasons or civilian years.
+;     - Growing seasons also start at arbitrary times with respect
+;       to civilian years, depending on latitude and local climate.
+;     - Missing values can occur at any time.
+;     - Hence the complete FAPAR record may contain an arbitrary
+;       number of initial data points before the start of a full
+;       growing season.
+
+;  Outcome:
+;     Unusable data at the start of the record (missing values or
+;     values corresponding to an on-going growing season) have been
+;     skipped. The search for a first complete growing season can
+;     start in earnest.
+
+;  Usage:
+;     rc = phenot_p3_strt()
+
+;  Input parameters: None.
+
+;  Output parameters: None.
+
+;  Return values:
+;     0: Normal completion.
+
+;  Remarks:
+;     This implementation uses the smoothed fapar array rather than
+;     the original record to limit sensitivity to local outliers.
+
+;  History:
+;     This is an updated version of Version: 6.0, Release: 1.0, of the routine
+;     gs6t_p3_strt.pro developed on 2007-09-20.
+
+;  Include the necessary common block(s):
+@cb_job.comm
+@cb_in.comm
+@cb_stat.comm
+@cb_frst.comm
+
+;MM+
+@cb_optstat.comm
+@cb_options.comm
+
+;  Initialize the return code:
+retcode = 0
+
+;  To avoid situations where the first valid (non-missing) records are
+;  already well into a growing season, define the threshold minimum
+;  FAPAR value under which the smoothed time series must evolve before
+;  initiating the search for the start of the first growing season as
+;  the median valid FAPAR value computed in gs6t_p2_stat.pro:
+fap_min_thresh = fap50pctl
+;IF (diag GT 2) THEN BEGIN
+;   PRINTF, diag_unit, 'fap_min_thresh = ', fap_min_thresh
+;ENDIF
+
+;  Scan the smoothed FAPAR time series from the start, and search for
+;  a valid (non-missing) value at least as low as fap_min_thresh, and
+;  not beyond the FAPAR record length:
+
+;IF (diag GT 1) THEN BEGIN
+;   PRINTF, diag_unit, 'First WHILE (based on smoothfapar).'
+;ENDIF
+if (vrbs eq 1) then print, 'First WHILE (based on fapar).'
+
+;;  Old code:
+;;  In this segment of code, i represents the time index, within the
+;;  smoothed time series, of the current period, considered as a
+;;  potential candidate for the start of the first full growing
+;;  season, in the same units as the original series (daily, decadal
+;;  or monthly):
+;i = 0
+;WHILE (i LT npts - 1) DO BEGIN
+;   IF ((smoothfapar [i] GT fap_min_thresh) OR $
+;      (smoothfapar [i] LT ibel)) THEN BEGIN
+;;      IF ((diag GT 2) AND (i EQ 0)) THEN PRINTF, diag_unit, $
+;;         'Observations started while a growing season was on-going.'
+;;      IF (diag GT 2) THEN PRINTF, diag_unit, i, smoothfapar [i], $
+;;         ' is larger than fap_min_thresh or missing.'
+;      i = i + 1
+;   ENDIF ELSE BEGIN
+;;      IF (diag GT 2) THEN PRINTF, diag_unit, i, smoothfapar [i], $
+;;         ' is valid and smaller than fap_min_thresh.'
+;      BREAK
+;   ENDELSE
+;ENDWHILE
+;  New code:
+;  In this segment of code, i represents the time index, within the
+;  fapar time series, of the current period, considered as a
+;  potential candidate for the start of the first full growing
+;  season, in the same units as the original series (daily, decadal
+;  or monthly):
+i = 0
+WHILE (i LT npts - 1) DO BEGIN
+   IF ((fapar [i] GT fap_min_thresh) OR $
+      (fapar [i] LT ibel)) THEN BEGIN
+;      IF ((diag GT 2) AND (i EQ 0)) THEN PRINTF, diag_unit, $
+;print, 'Observations started while a growing season was on-going or with a missing value:'
+;      IF (diag GT 2) THEN PRINTF, diag_unit, i, smoothfapar [i], $
+      if (vrbs eq 1) then print, fapar [i], ' is larger than fap_min_thresh or missing.'
+      i = i + 1
+   ENDIF ELSE BEGIN
+;      IF (diag GT 2) THEN PRINTF, diag_unit, i, smoothfapar [i], $
+      if (vrbs eq 1) then print, fapar [i], ' is valid and smaller than fap_min_thresh.'
+      BREAK
+   ENDELSE
+ENDWHILE
+
+;  Keep going through the smoothed FAPAR record as long as the valid
+;  values are lower than fap_min_thresh or missing values, and in any
+;  case not beyond the smoothed FAPAR record length:
+
+;IF (diag GT 1) THEN BEGIN
+;   PRINTF, diag_unit, 'Second WHILE (based on smoothfapar).'
+;ENDIF
+if (vrbs eq 1) then print, 'Second WHILE (based on fapar).'
+
+WHILE (i LT npts) DO BEGIN
+   IF ((fapar [i] LE fap_min_thresh) OR $
+      (fapar [i] GT iabo)) THEN BEGIN
+;      IF (diag GT 2) THEN PRINTF, diag_unit, i, smoothfapar [i], $
+      if (vrbs eq 1) then print, fapar [i], ' remains smaller than fap_min_thresh or missing.'
+      i = i + 1
+   ENDIF ELSE BEGIN
+;      IF (diag GT 2) THEN PRINTF, diag_unit, i, smoothfapar [i], $
+;         ' is the first time the smoothed FAPAR increases from ' + $
+;         'below to above fap_min_thresh.'
+      if (vrbs eq 1) then print, fapar [i], ' is the first time the smoothed FAPAR increases from ' + $
+         'below to above fap_min_thresh.'
+      BREAK
+   ENDELSE
+ENDWHILE
+
+frst_rise = i
+
+;  Locate the end of the period containing the previous growing season
+;  as the minimum in the smoothed fapar record, within a limited time
+;  period preceding this first rise (typically a quarter of the
+;  expected season length, plus some margin), and not before the start
+;  of the record anyway:
+
+;  For the time being, reset ngspy to 2 if a larger number was identified (as in the case
+;  of SeaWiFS_IT-Roc1_c03_19972006_f10_d20090108.xdat, where at least 3 peaks are detected
+;  by the Lomb algorithm):
+IF (ngspy GT 2) THEN BEGIN
+   ngspy = 2
+   if (vrbs eq 1) then begin
+    PRINT, '*** phenot_p3_strt.pro [WARNING]:
+    PRINT, '    The expected number of growing seasons has been reset to 2.'
+    STOP, 'To proceed with the execution, enter .CONT'
+   endif
+ENDIF
+
+CASE ngspy OF
+   1: BEGIN
+         CASE period OF
+            30: timper = 3
+            10: timper = 9
+            1: timper = 90
+         ENDCASE
+      END
+   2: BEGIN
+         CASE period OF
+            30: timper = 2
+            10: timper = 6
+            1: timper = 60
+         ENDCASE
+      END
+ENDCASE
+
+;  The applicable time period is [frst_rise - timper, frst_rise],
+;  provided frst_rise - timper is not earlier than the start of the
+;  record:
+frst = MAX([frst_rise - timper, 0])
+if (vrbs eq 1) then print, 'frst = ', frst
+
+;  Locate the minimum of the valid values of smoothed fapar in that
+;  period:
+;goodsmf = WHERE((smoothfapar [frst:frst_rise] GE ibel) AND $
+;   (smoothfapar [frst:frst_rise] LE iabo))
+;minsmfap = MIN(smoothfapar [frst + goodsmf], minsmfap_idx)
+goodsmf = WHERE((fapar [frst:frst_rise] GE ibel) AND $
+   (fapar [frst:frst_rise] LE iabo))
+minsmfap = MIN(fapar [frst + goodsmf], minsmfap_idx)
+if (vrbs eq 1) then begin
+  print, 'goodsmf = ', goodsmf
+  print, 'minsmfap = ', minsmfap
+endif
+
+;  Finally, set the end of the period containing the previous growing
+;  season, converting the long integer index into a short integer:
+iniend = frst + FIX(minsmfap_idx)
+if (vrbs eq 1) then print, 'iniend = ', iniend
+
+;IF (diag GT 2) THEN BEGIN
+;   PRINTF, diag_unit, 'frst_rise = ', frst_rise
+;   PRINTF, diag_unit, 'timper = ', timper
+;   PRINTF, diag_unit, 'frst = ', frst
+;   PRINTF, diag_unit, 'goodsmf = ', goodsmf
+;   PRINTF, diag_unit, 'smoothfapar [frst + goodsmf] = ', $
+;      smoothfapar [frst + goodsmf]
+;   PRINTF, diag_unit, 'minsmfap = ', minsmfap
+;   PRINTF, diag_unit, 'minsmfap_idx = ', $
+;      frst + goodsmf [0] + minsmfap_idx
+;   PRINTF, diag_unit, 'iniend = ', iniend
+;ENDIF
+
+RETURN, retcode
+
+END

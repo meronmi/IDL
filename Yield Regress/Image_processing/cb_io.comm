@@ -1,0 +1,4 @@
+COMMON io, base_path, rs_product_dir, pheno_path, layer_path, yield_path, out_path, $
+           AFCM_fn, crop_base_name, $
+           maxFapar_fn, cm_fn, dept_fn, yield_fn, surface_fn, ns, nl, nb, yield_base_name, $
+           surface_base_name, varY, dept_names_fn

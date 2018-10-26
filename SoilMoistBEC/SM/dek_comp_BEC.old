@@ -1,0 +1,119 @@
+PRO dek_comp_BEC
+  ;makes 10-day composite of daily BEC SM data (note that 2 image per day may be available (asc and desc orbit)
+  dir_in = '\\ies\d5\asap\BEC_soil_moisture\data'
+  dir_out = '\\ies\d5\asap\BEC_soil_moisture\dataENVIformat'
+  
+  ;First day of first composite , IT MUST be day 01, 11 or 21
+  firstDate = '20100121'
+  ;Last day of first composite , IT MUST be day 01, 11 or 21 
+  lastDate = '20170901' 
+  ;name of the variable to read from netcdf
+  varName = 'SM'
+  ;*************************************************************************************************************
+  
+  fns = FILE_BASENAME(FILE_SEARCH(dir_in,'*.nc'))
+  ;retrive dims and other info from first file
+  ncdfObj = Obj_New('NCDF_DATA', dir_in + '\' + fns[0], /NO_READ_ON_PARSE)
+  IF Obj_Valid(ncdfObj) THEN BEGIN
+;    ncdfObj -> Browse, NO_NEW_FILE=Keyword_Set(no_new_file)
+    GlobAttr = ncdfObj-> ReadGlobalAttr()
+    x = ncdfObj -> ReadVariableWithAttr(varName)
+    sz = SIZE(x.data)
+    noDataVal = x.MISSING_VALUE
+    description = x.DESCRIPTION
+    units = x.UNITS
+    geoInfo = x.GRID_MAPPING
+    ;PRINT, GlobAttr
+    ;x = ncdfObj -> ReadVariable('SM')
+  ENDIF
+  Obj_Destroy, ncdfObj
+  
+  yyyymmdd = INTARR(3, N_ELEMENTS(fns))
+  yyyymmdd[0,*] = FIX(STRMID(fns, 13, 4))
+  yyyymmdd[1,*] = FIX(STRMID(fns, 17, 2))
+  yyyymmdd[2,*] = FIX(STRMID(fns, 19, 2))
+  jd = REFORM(JULDAY( yyyymmdd[1,*], yyyymmdd[2,*], yyyymmdd[0,*], 12))
+  indSorted = SORT(jd)
+  yyyymmdd = yyyymmdd[*,indSorted]
+  jd = jd[indSorted]
+  fns = fns[indSorted]
+  
+  firstYyyymmdd = [FIX(STRMID(firstDate, 0, 4)), FIX(STRMID(firstDate, 4, 2)), FIX(STRMID(firstDate, 6, 2))]
+  lastYyyymmdd = [FIX(STRMID(lastDate, 0, 4)), FIX(STRMID(lastDate, 4, 2)), FIX(STRMID(lastDate, 6, 2))]
+  
+  ;find the first
+  indFirst = WHERE((firstYyyymmdd[0] EQ yyyymmdd[0,*]) AND $
+                   (firstYyyymmdd[1] EQ yyyymmdd[1,*]) AND $
+                   (firstYyyymmdd[2] EQ yyyymmdd[2,*]))
+  indFirst = indFirst[0] ; in case more than two files are present make sure we use both
+  eos = 0 ;end of series condition
+  WHILE eos EQ 0 DO BEGIN
+    ;indFirst is the index to the first image of the ten day
+    ;now find the subscript of the last 
+    ;if firs is is 1 or 11, the last is 10 or 20
+    ;if it is 21, the last is the last of the month
+    CASE yyyymmdd[2,indFirst] OF
+      1: indLast = WHERE((yyyymmdd[0,indFirst] EQ yyyymmdd[0,*]) AND $  ;yyyy
+                        (yyyymmdd[1,indFirst] EQ yyyymmdd[1,*]) AND $  ;mm
+                        (10 EQ yyyymmdd[2,*]), count)                         ;dd
+      11:indLast = WHERE((yyyymmdd[0,indFirst] EQ yyyymmdd[0,*]) AND $
+                        (yyyymmdd[1,indFirst] EQ yyyymmdd[1,*]) AND $
+                        (20 EQ yyyymmdd[2,*]), count)
+      21: BEGIN
+        indLast = WHERE((yyyymmdd[0,indFirst] EQ yyyymmdd[0,*]) AND $
+                       (yyyymmdd[1,indFirst] EQ yyyymmdd[1,*])) ;here I have all of that month
+        
+        indLast = indLast[WHERE(MAX(yyyymmdd[2,indLast]) EQ yyyymmdd[2,indLast], count)]
+        END
+    ENDCASE
+    indLast = indLast[-1] ;take the last one i case there are more than one file per day 
+    IF (count GT 0) THEN BEGIN
+      ; do the 10-day comp
+      ; determine how many images are to be used
+      nimages = N_ELEMENTS(fns[indFirst:indLast])
+      PRINT, STRTRIM(nimages,2) + ' images for ' + STRTRIM(yyyymmdd[0,indFirst],2) + ' '  + STRTRIM(yyyymmdd[1,indFirst],2) + ' ' + STRTRIM(yyyymmdd[2,indFirst],2)
+      ; make the mattrix to store data
+      x = MAKE_ARRAY(sz[1],sz[2], nimages, TYPE=sz[-2])
+      ; loop on the files to be loaded
+      FOR i = 0, nimages- 1 DO BEGIN
+        fn = fns[indFirst + i]
+        ;debug
+      ;  PRINT, fn
+        ncdfObj = Obj_New('NCDF_DATA', dir_in + '\' + fn, /NO_READ_ON_PARSE)
+        IF Obj_Valid(ncdfObj) THEN  x[*,*,i] = ncdfObj -> ReadVariable(varName) ELSE STOP
+        Obj_Destroy, ncdfObj
+      ENDFOR
+      ;make the composite
+      indNAN = WHERE(x EQ noDataVal, count)
+      IF (count GT 0) THEN x[indNAN] = !VALUES.F_NAN 
+      ;avoid floating errors when it is all nan
+      !except=0 
+      meanX = MEAN(x, DIMENSION=3, /NAN)
+      clear = CHECK_MATH() ;set back to normal
+      !except=1
+      ;save the composite
+      base_fn_out = dir_out + '\sm_' + STRTRIM(yyyymmdd[0,indFirst],2) + STRING(yyyymmdd[1,indFirst], FORMAT='(I02)') + STRING(yyyymmdd[2,indFirst], FORMAT='(I02)') 
+      OPENW, lun, base_fn_out + '.img', /GET_LUN
+      WRITEU, lun, REVERSE(meanX,2) ; flip it
+      FREE_LUN, lun
+      res = write_envi_hdr(base_fn_out + '.hdr', sz[1], sz[2], 4, NBANDS=1, INTERLEAVE='bsq',$ 
+      ;MAPINFO='{EASE-Grid Global, 1.5000, 1.5000, -17321659.7750, 7332251.0625, 2.5067525000e+04, 2.5067525000e+04, WGS-84, units=Meters}', PROJECTIONINFO='{99, 6371228.0, 6371228.0, 0.000000, 0.000000, 0.0, 0.0, 30.000000, EASE-Grid Global, WGS-84, User Proj Cylind Equal Area, units=Meters}', $
+      ;FREE_TEXT = 'BEC ' + varName + ', IDL dekadal domposite') ;, MAPINFO=geoInfo
+      MAPINFO=' {EASE-Grid Global, 1,1, -17363604.8790229, 7307299.43225504, 2.5025e+04, 2.5025e+04, WGS-84, units=Meters}', PROJECTIONINFO='{99, 6371228.0, 6371228.0, 0.000000, 0.000000, 0.0, 0.0, 30.000000, EASE-Grid Global, WGS-84, User Proj Cylind Equal Area, units=Meters}', $
+      FREE_TEXT = 'BEC ' + varName + ', IDL dekadal domposite') ;, MAPINFO=geoInfo
+      ;reproject and resample to MODIS
+      ;here I have to set the path befor sensing the gdal command because the spawn window have a different path
+      str1spawn = 'set path=C:\Program Files\EMC NetWorker\nsr\bin;C:\Python278\Scripts;C:\Python278\Lib\site-packages;C:\Python278;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\OSGeo4W64\bin;C:\Program Files\TortoiseGit\bin;C:\Program Files\Exelis\IDL82\bin\bin.x86_64;C:\Program Files (x86)\Skype\Phone\;C:\Program Files\MATLAB\R2016a\bin;d:\Users\meronmi\AppData\Local\Continuum\Anaconda3;d:\Users\meronmi\AppData\Local\Continuum\Anaconda3\Scripts;X:\dev\gdal\2.2.1\bin;X:\dev\gdal\2.2.1\bin\gdal\apps;c:\MRT\bin;d:\Users\meronmi\AppData\Local\Microsoft\WindowsApps'
+      str2spawn = 'gdalwarp -t_srs EPSG:4326 -te -180 -56.00892859 180 75 -s_srs EPSG:6933 -tr 0.00892857143 0.00892857143 -of ENVI ' + base_fn_out + '.img ' + base_fn_out + 'BOKUgrid.img'
+      SPAWN, str1spawn + ' & ' +str2spawn, /HIDE, /NOWAIT
+       
+      ; update first
+      indFirst = indLast + 1
+    ENDIF ELSE BEGIN
+      ; no last was found, do not attempt making the composite 
+      eos = 1
+    ENDELSE
+  ENDWHILE
+
+  PRINT, 'Here
+END

@@ -1,0 +1,112 @@
+Report generated on Mon May 24 18:03:30 2010
+
+Number of files: 1
+List:
+h120090613%0.064
+
+#Note that the following info are based on first file only
+
+Spec serial: HR4C1178.spec
+CVI program version:        2.0000000
+MAXPIXELM:         3648
+Sandwitch (if single beam):            1
+
+IDL program version: 3.3
+
+Correction level: v4
+# v3: resampling, rad cal
+# v4: resampling, rad cal, dc drift correction
+# v5: resampling, rad cal, nl correction
+# v6: resampling, rad cal, dc drift correction, nl correction 
+
+
+D:\codice\IDL\oo_idl\OO_IDL\configuration_files\measurements_info.txt
+USE_LIST_from_file.in(yes/no)=no
+COMMENT=SENT3 Pisa San Piero a Grado 2009 mpm
+PCtime(timesaving/solar)=solar
+OUTPUTtime(solar_local,UTC)=solar_local
+solar_local-UTC(hours)=1
+LATITUDE=43.669913
+LONGITUDE=10.302483
+
+WR_CAL_filename=FS_MPM_cos.cal
+;WR_CAL_filename=CF_MPM_cos.cal
+
+DEFECTIVE_CCD_PIXELS_filename=HR4C1178_defeating_pixels.ccd.dp
+;DEFECTIVE_CCD_PIXELS_filename=HR2A0707_defeating_pixels.ccd.dp
+
+CORRECT_DC_DRIFT(yes/no)=yes
+FIRST_OPTICAL_BLACK(first is 0)=6
+LAST_OPTICAL_BLACK(first is 0)=15
+
+CORRECT_NON_LINEARITY(yes/no)=no
+
+RUN_ALL(0 is NO)=0
+FUNCTION_FOR_FS=0
+LOWER_LIMIT_FOR_FS=759
+UPPER_LIMIT_FOR_FS=767.76
+
+SAVGOL_SMOOTHING_WING(0 is NO)=0
+
+WEIGHT_OBS_FOR_1/Ls(0 is NO, 1 is 1/Ls, 2 is 1/(Ls^2))=0
+
+DO_PLOT(yes/no)=no
+
+PLOT_AND_SAVE(file_name/all)=all
+FS_unit(Watts/umol)=Watts
+Report generated on Mon May 24 18:04:52 2010
+
+Number of files: 1
+List:
+h120090613%0.064
+
+#Note that the following info are based on first file only
+
+Spec serial: HR4C1178.spec
+CVI program version:        2.0000000
+MAXPIXELM:         3648
+Sandwitch (if single beam):            1
+
+IDL program version: 3.3
+
+Correction level: v4
+# v3: resampling, rad cal
+# v4: resampling, rad cal, dc drift correction
+# v5: resampling, rad cal, nl correction
+# v6: resampling, rad cal, dc drift correction, nl correction 
+
+
+D:\codice\IDL\oo_idl\OO_IDL\configuration_files\measurements_info.txt
+USE_LIST_from_file.in(yes/no)=no
+COMMENT=SENT3 Pisa San Piero a Grado 2009 mpm
+PCtime(timesaving/solar)=solar
+OUTPUTtime(solar_local,UTC)=solar_local
+solar_local-UTC(hours)=1
+LATITUDE=43.669913
+LONGITUDE=10.302483
+
+WR_CAL_filename=FS_MPM_cos.cal
+;WR_CAL_filename=CF_MPM_cos.cal
+
+DEFECTIVE_CCD_PIXELS_filename=HR4C1178_defeating_pixels.ccd.dp
+;DEFECTIVE_CCD_PIXELS_filename=HR2A0707_defeating_pixels.ccd.dp
+
+CORRECT_DC_DRIFT(yes/no)=yes
+FIRST_OPTICAL_BLACK(first is 0)=6
+LAST_OPTICAL_BLACK(first is 0)=15
+
+CORRECT_NON_LINEARITY(yes/no)=no
+
+RUN_ALL(0 is NO)=0
+FUNCTION_FOR_FS=0
+LOWER_LIMIT_FOR_FS=759
+UPPER_LIMIT_FOR_FS=767.76
+
+SAVGOL_SMOOTHING_WING(0 is NO)=0
+
+WEIGHT_OBS_FOR_1/Ls(0 is NO, 1 is 1/Ls, 2 is 1/(Ls^2))=0
+
+DO_PLOT(yes/no)=no
+
+PLOT_AND_SAVE(file_name/all)=all
+FS_unit(Watts/umol)=Watts

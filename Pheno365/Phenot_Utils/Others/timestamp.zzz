@@ -1,0 +1,86 @@
+FUNCTION timestamp, tstamp
+
+;  Purpose:
+;     This IDL routine returns a 14-character long string containing the
+;     current date and time in a standardized format suitable for creating a
+;     time stamp.
+
+;  Input parameter: None.
+
+;  Output parameter:
+;     1. tstamp: the current date and time information in the format
+;        YYYYMMDDhhmmss, where:
+;           YYYY is the calendar year,
+;           MM is the month number (between 01 for January and 12 for
+;           December),
+;           DD is the day number in the month (between 01 and 31),
+;           hh is the hour (between 00 and 23),
+;           mm is the minute (between 00 and 59), and
+;           ss is the second (between 00 and 59).
+
+;  Return value:
+;     0: Normal completion.
+;    21: Unexpected month information retrieved from SYSTIME.
+;        The resulting time stamp may not be valid.
+
+;  Usage:
+;     rc = timestamp(tstamp)
+
+;  Versioning:
+;     2006-11-13: Initial release.
+;     2006-12-05: Version without diagnostics, but with updated
+;        documentation.
+;     2007-06-04: Bug fixed (output days, hours, minutes and seconds
+;        smaller than 10 as '0x' instead of ' x'.
+;     2008-09-12: Version ported to IDL 7.0 and the Eclipse Workbench.
+;     Version 1.1: Port under Suse Linux (starting February 2010).
+
+;  Initialize the return code:
+retcode = 0
+
+;  Get the current time from the system clock (a 24-character long
+;  string formatted 'DOW MON DD HH:MM:SS YEAR'):
+today = SYSTIME()
+
+;  Extract the year, month, day, and time information:
+now_yer = STRMID(today, 20, 4)
+
+month_name = STRMID(today, 4, 3)
+CASE month_name OF
+   'Jan': now_mon = '01'
+   'Feb': now_mon = '02'
+   'Mar': now_mon = '03'
+   'Apr': now_mon = '04'
+   'May': now_mon = '05'
+   'Jun': now_mon = '06'
+   'Jul': now_mon = '07'
+   'Aug': now_mon = '08'
+   'Sep': now_mon = '09'
+   'Oct': now_mon = '10'
+   'Nov': now_mon = '11'
+   'Dec': now_mon = '12'
+   ELSE: BEGIN
+      now_mon = '00'
+      retcode = 21
+   END
+ENDCASE
+
+now_day = STRMID(today, 8, 2)
+IF (STRMID(now_day, 0, 1) EQ ' ') THEN now_day = '0' + $
+   STRMID(now_day, 1, 1)
+now_hor = STRMID(today, 11, 2)
+IF (STRMID(now_hor, 0, 1) EQ ' ') THEN now_hor = '0' + $
+   STRMID(now_hor, 1, 1)
+now_min = STRMID(today, 14, 2)
+IF (STRMID(now_min, 0, 1) EQ ' ') THEN now_min = '0' + $
+   STRMID(now_min, 1, 1)
+now_sec = STRMID(today, 17, 2)
+IF (STRMID(now_sec, 0, 1) EQ ' ') THEN now_sec = '0' + $
+   STRMID(now_sec, 1, 1)
+
+;  Concatenate the time stamp character string:
+tstamp = now_yer + now_mon + now_day + now_hor + now_min + now_sec
+
+RETURN, retcode
+
+END

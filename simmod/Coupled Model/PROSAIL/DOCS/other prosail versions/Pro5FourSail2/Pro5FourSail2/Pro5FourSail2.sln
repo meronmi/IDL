@@ -1,0 +1,20 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 9.00
+# Visual Studio 2005
+Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "Pro5FourSail2", "Pro5FourSail2.vfproj", "{35C932A0-309C-4802-9F39-0AFB35F6CF5D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{35C932A0-309C-4802-9F39-0AFB35F6CF5D}.Debug|Win32.ActiveCfg = Debug|Win32
+		{35C932A0-309C-4802-9F39-0AFB35F6CF5D}.Debug|Win32.Build.0 = Debug|Win32
+		{35C932A0-309C-4802-9F39-0AFB35F6CF5D}.Release|Win32.ActiveCfg = Debug|Win32
+		{35C932A0-309C-4802-9F39-0AFB35F6CF5D}.Release|Win32.Build.0 = Debug|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

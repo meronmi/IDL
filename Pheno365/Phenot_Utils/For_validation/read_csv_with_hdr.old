@@ -1,0 +1,32 @@
+FUNCTION read_csv_with_hdr, fname, dlmtr
+  ;  Purpose:
+  ;     load a csv with hdr file into two matix, one for the hdr and one for the data
+  ;  Input parameters:
+  ;     fname: full path csv file name
+  ;     dlmts: field separator, typically ',' for csv
+  
+  ;  Return values:
+  ;     two matric of string, on for the hdr, one for the data
+  ;  Example:
+  ;     [hdr, mat] = read_csv_with_hdr('S:\Actions\FOODSEC\temporary_share\4 Anne\Biomass_Afr\SENEGAL_IDL_FORMAT_2014-01-14.csv', ',')
+  ;  History:
+  ;     Version 1.0: created by MM on 14 jan 2014
+str=''
+nlines = FILE_LINES(fname)
+OPENR, lun, fname, /get_lun
+;read hdr
+READF, lun, str
+dataInTheRow = STRSPLIT(str, dlmtr, count=n_col, /EXTRACT, /PRESERVE_NULL)
+hdr = dataInTheRow
+mat = STRARR(n_col, nlines) 
+FOR i = 1L, nlines-1 DO BEGIN
+  READF, lun, str
+  dataInTheRow=STRSPLIT(str, dlmtr, count=n_col, /EXTRACT, /PRESERVE_NULL)
+  mat[*,i] = dataInTheRow
+ENDFOR
+FREE_LUN, lun
+ret = {hdr:hdr, data:mat}
+RETURN, ret
+ 
+  
+END

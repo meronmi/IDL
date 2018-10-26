@@ -1,0 +1,27 @@
+Some info/description of the file.
+
+1) number of growing seasons per year
+vt_KK0.img
+values between 100 and 199: one season 
+values between 200 and 252: two season
+
+2-3) Start of season
+vt_s1.img (first season)
+vt_s2.img (second season)
+
+4-5) End of season
+vt_e1.img (first season)
+vt_e2.img (second season)
+
+6-7) Timing of max:
+vt_m1.img (first season)
+vt_m2.img (second season)
+
+8-9) Timing of start of senescence:
+vt_sen1.img
+vt_sen2.img
+
+Phenology timings: the value V in the image is expressed over a 3 years period, from 1 to 108 dekads. Example for a season crossing the calendar year. vt_s1 = 30, last dekad of October, vt_e1 = 46, first dekad of April -> T = 46 - 36 = 10. Therefore, to get the timing T in the 1-36 dekad units, one can use:
+IF V <= 36 THEN T = V
+IF 36 < V <= 72 THEN T = V -36 
+IF V > 72 THEN T = V - 72

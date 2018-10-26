@@ -1,0 +1,266 @@
+;  Purpose:
+;     The following procedures are handlers of the regression process.
+;     User parameter are set here and in set_io.pro
+;     If a new task has to be initate, a new job handler must be written
+;     
+;
+;  Outcome:
+;     Management of the regression process 
+;
+;  Restriction:
+;     none
+
+;  Usage:
+;     job_handler_XXX
+
+;  Input parameters: None. 
+;  Output parameters: None.
+;  Return values: None
+;
+;  Author:
+;     Michele Meroni, michele.meroni@jrc.ec.europa.eu
+;     
+;  History:
+;     Version 01:  Beta version, May 2011
+;     Version 0.1: Beta version with comments added for CNCT, November 2011
+
+;  References:
+;     none
+
+
+PRO job_handler_tunisia
+;This is the handler for Tunisia job
+
+
+@cb_io.comm 
+@cb_options.comm 
+
+;####################################################################################
+;USER DEFINED SETTINGS
+;root directory where input and output data are stored
+base_path = 'K:\Tunisia'
+
+;relative path to directory storing Remote Sensing data
+rs_product_dir = '\VGT_data\bil\DIR_RECOMPOSED_UppEnv_17_feb\REALIGN_ON_eos' ;'\BP_data\BIL\test';'\VGT_data\bil\DIR_RECOMPOSED_UppEnv_17_feb\REALIGN_ON_eos'
+
+;administrative boundaries and yield data has to be placede in the folders:
+;'\lc_dp_layer' and '\yield_data'
+
+;area fraction crop mask file name (bsq, byte, crop mask pixel value= 0-200 DM (for % coverage ranging from 0 to 100%))
+AFCM_fn = 'AFI_CNCT_ceral_mask_Feb_2012';'CNCT_binary_cereals_mask'; 'Tunisia_glcovCRO'
+;maximum fAPAR file name (it is optionally used to mask pixels having it lower than a threshold)
+maxFapar_fn = 'A1-1997_maxv1'    ;bil file with a number of band equivalent to that of RS products)
+;department raster map file name
+dept_fn = 'pure_rel_dept_base1x'
+
+;Crop base name (yield file and surface names are formed with it, yield_' + crop_base_name, 'surface_' + crop_base_name 
+crop_base_name = 'durum_wheat' ;'soft_wheat';'barley';'durum_wheat'
+;the output path is done with: out_path=path+'\yield_reg_out\'+crop_base_name
+
+;define RS product chracteristics (from VGT data at 1000 m resolution)
+ns = 494                      ; number of samples
+nl = 842                      ; number of lines
+nb = 15                       ; number of years  from 2007-2008
+
+; Set the yield year to be associated with the first band of the RS product. 
+; This is used to match RS and with the yield. 
+; e.g. for tunisia the first band goes from dek 20 of 97 to dek 20 of 98, the
+; frst_RS_yr for the match will be 1998 (because they are related to yield in 1998)
+; if I use the the Aligned with 1 according to EOS, il primo è 97 (97 e 98 dovrebbero essere vuoti)
+yield_Year_4_frst_RS_band=1997;1998
+
+;####################################################################################
+
+;OPTIONS
+ret = set_options()
+;I/O details
+ret = set_IO()
+
+
+
+                   
+ret=rs_yield_regress()
+PRINT, 'Processing completed'
+END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+;PRO job_handler_niger_cleaned
+;;NIGER
+;
+;;set path and filenames and user defined parameters
+;;for running rs_yield_regress.pro
+; 
+;COMMON exclude, excludeDepts, excludeYears
+;COMMON param, MinPixPerDept, MinCropFract, UseMaxFaparThreshold, $
+;              MaxFaparThreshold, UseCropMask, ComputeSurface
+;COMMON settings, pheno_products, dept_ids, frst_RS_yr, doplot, verbose
+;COMMON io, pheno_path, layer_path, yield_path, out_path, $
+;           maxFapar_fn, cm_fn, dept_fn, yield_fn, ns, nl, nb
+;
+;;Exclude data ;0 or list the data to be escluded
+;excludeDepts=0   
+;excludeYears=0
+;
+;;Parameters
+;UseCropMask=0;1; 0;1         ;use crop mask
+;MinCropFract=0.90       ;(0-1), pixels having a fractional crop cover less than MinCropFract are not considered in the analisys
+;MinPixPerDept=50        ;minimum number of pixels per department, with less for the moment the program stop
+;UseMaxFaparThreshold=0;1;0  ;1 for eduardo;use max fapar threshold (ignore, mask out pixels having a max LT threshold)
+;MaxFaparThreshold=0.15; for Eduardo, no mask 0.15
+;
+;;Settings
+;;-pheno products to be used
+;pheno_products=['sos1_decoy','maxt1_decoy','maxv1','acc1','acc1b','acc1e','acc1eb','d15','d16','d17','d18','d19','d20','d21','d22','d23','d24','d25', $
+;                        'd26','d27','d28','d29','d30','d31','d32','d33','d34','d35','d36','d1','d2','d3','d4','d5']
+;;pheno_products=['d27','d28']
+;;-define departments (Department map pixel value= dep. code or 0) 
+;dept_ids=[54,55,57,58,59,60,61,62,63,64,65,66,67,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90]
+;;dept_ids=[54,55,57,58,59,60,61,62,63,64,65,66,67,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90]
+;; define years for which yield stat are avialable
+;;n_yield_yrs=10
+;;frst_yield_yr=2000
+;; define the first year of Rs data
+;frst_RS_yr=1999
+;
+;;IO, I/O details
+;;define path
+;path='X:\Niger'
+;pheno_path=path+'\VGT data\pheno_products'
+;layer_path=path+'\lc_dp_layer\New_layers'
+;yield_path=path+'\yield_data'
+;out_path=path+'\yield_reg_out'
+;;input files
+;cm_fn=layer_path+'\'+'niger_CM_v22_%crop_VGT'                    ;bsq, byte, crop mask pixel value= 0-200 DM (for % coverage ranging from 0 to 100%)
+;maxFapar_fn=pheno_path+'\'+'maxv1'
+;dept_fn=layer_path+'\'+'dep'
+;
+;;yield_data
+;yield_fn=yield_path+'\'+'dep-year-yield.csv'
+;
+;;define pheno product image chracteristics (from VGT data at 1000 m resolution)
+;ns = 1600                    ; number of samples
+;nl = 900                     ; number of lines
+;nb = 13                      ; number of years  from 2009
+;                   
+;ret=rs_yield_regress()
+;PRINT, 'Processing completed'
+;END
+;
+;
+;
+;
+;
+;
+;
+;
+;PRO job_handler_niger_swets
+;;NIGER
+;
+;;set path and filenames and user defined parameters
+;;for running rs_yield_regress.pro
+; 
+;COMMON exclude, excludeDepts, excludeYears
+;COMMON param, MinPixPerDept, MinCropFract, UseMaxFaparThreshold, $
+;              MaxFaparThreshold, UseCropMask, ComputeSurface
+;COMMON settings, pheno_products, dept_ids, frst_RS_yr, doplot, verbose
+;COMMON io, pheno_path, layer_path, yield_path, out_path, $
+;           maxFapar_fn, cm_fn, dept_fn, yield_fn, ns, nl, nb
+;
+;;Exclude data ;0 or list the data to be escluded
+;excludeDepts=0   
+;excludeYears=0
+;
+;;Parameters
+;UseCropMask=1; 0;1         ;use crop mask
+;MinCropFract=0.90       ;(0-1), pixels having a fractional crop cover less than MinCropFract are not considered in the analisys
+;MinPixPerDept=50        ;minimum number of pixels per department, with less for the moment the program stop
+;UseMaxFaparThreshold=1;0  ;1 for eduardo;use max fapar threshold (ignore, mask out pixels having a max LT threshold)
+;MaxFaparThreshold=0.15; for Eduardo, no mask 0.15
+;
+;;Settings
+;;-pheno products to be used
+;pheno_products=['sos1_decoy','maxt1_decoy','maxv1','acc1','acc1b','acc1e','acc1eb','d15','d16','d17','d18','d19','d20','d21','d22','d23','d24','d25', $
+;                        'd26','d27','d28','d29','d30','d31','d32','d33','d34','d35','d36','d1','d2','d3','d4','d5', $
+;                        "g10d10b0","g10d10b1","g10d20b0","g10d20b1","g10d30b0","g10d30b1","g10d40b0", $
+;                        "g10d40b1","g10d50b0","g10d50b1","g10d60b0","g10d60b1","g10d70b0","g10d70b1",$
+;                        "g10d80b0","g10d80b1","g10d90b0","g10d90b1","g20d10b0","g20d10b1","g20d20b0",$
+;                        "g20d20b1","g20d30b0","g20d30b1","g20d40b0","g20d40b1","g20d50b0","g20d50b1",$
+;                        "g20d60b0","g20d60b1","g20d70b0","g20d70b1","g20d80b0","g20d80b1","g20d90b0",$
+;                        "g20d90b1","g30d10b0","g30d10b1","g30d20b0","g30d20b1","g30d30b0","g30d30b1",$
+;                        "g30d40b0","g30d40b1","g30d50b0","g30d50b1","g30d60b0","g30d60b1","g30d70b0",$
+;                        "g30d70b1","g30d80b0","g30d80b1","g30d90b0","g30d90b1","g40d10b0","g40d10b1",$
+;                        "g40d20b0","g40d20b1","g40d30b0","g40d30b1","g40d40b0","g40d40b1","g40d50b0",$
+;                        "g40d50b1","g40d60b0","g40d60b1","g40d70b0","g40d70b1","g40d80b0","g40d80b1",$
+;                        "g40d90b0","g40d90b1","g50d10b0","g50d10b1","g50d20b0","g50d20b1","g50d30b0",$
+;                        "g50d30b1","g50d40b0","g50d40b1","g50d50b0","g50d50b1","g50d60b0","g50d60b1",$
+;                        "g50d70b0","g50d70b1","g50d80b0","g50d80b1","g50d90b0","g50d90b1","g60d10b0",$
+;                        "g60d10b1","g60d20b0","g60d20b1","g60d30b0","g60d30b1","g60d40b0","g60d40b1",$
+;                        "g60d50b0","g60d50b1","g60d60b0","g60d60b1","g60d70b0","g60d70b1","g60d80b0",$
+;                        "g60d80b1","g60d90b0","g60d90b1","g70d10b0","g70d10b1","g70d20b0","g70d20b1",$
+;                        "g70d30b0","g70d30b1","g70d40b0","g70d40b1","g70d50b0","g70d50b1","g70d60b0",$
+;                        "g70d60b1","g70d70b0","g70d70b1","g70d80b0","g70d80b1","g70d90b0","g70d90b1",$
+;                        "g80d10b0","g80d10b1","g80d20b0","g80d20b1","g80d30b0","g80d30b1","g80d40b0",$
+;                        "g80d40b1","g80d50b0","g80d50b1","g80d60b0","g80d60b1","g80d70b0","g80d70b1",$
+;                        "g80d80b0","g80d80b1","g80d90b0","g80d90b1","g90d10b0","g90d10b1","g90d20b0",$
+;                        "g90d20b1","g90d30b0","g90d30b1","g90d40b0","g90d40b1","g90d50b0","g90d50b1",$
+;                        "g90d60b0","g90d60b1","g90d70b0","g90d70b1","g90d80b0","g90d80b1","g90d90b0","g90d90b1", $
+;                        "g10d99b0","g10d99b1","g20d99b0","g20d99b1","g30d99b0","g30d99b1","g40d99b0","g40d99b1", $
+;                        "g50d99b0","g50d99b1","g60d99b0","g60d99b1","g70d99b0","g70d99b1","g80d99b0","g80d99b1", $
+;                        "g90d99b0","g90d99b1","g99d10b0","g99d10b1","g99d20b0","g99d20b1","g99d30b0","g99d30b1", $
+;                        "g99d40b0","g99d40b1","g99d50b0","g99d50b1","g99d60b0","g99d60b1","g99d70b0","g99d70b1", $
+;                        "g99d80b0","g99d80b1","g99d90b0","g99d90b1"]
+;;pheno_products=['d27','d28']
+;;-define departments (Department map pixel value= dep. code or 0) 
+;dept_ids=[54,55,57,58,59,60,61,62,63,64,65,66,67,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90]
+;;dept_ids=[54,55,57,58,59,60,61,62,63,64,65,66,67,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90]
+;; define years for which yield stat are avialable
+;;n_yield_yrs=10
+;;frst_yield_yr=2000
+;; define the first year of Rs data
+;frst_RS_yr=1998
+;
+;;IO, I/O details
+;;define path
+;path='X:\Niger'
+;pheno_path=path+'\VGT data\pheno_products\v2\SWETS fAPAR'
+;layer_path=path+'\lc_dp_layer\New_layers'
+;yield_path=path+'\yield_data'
+;out_path=path+'\yield_reg_out'
+;;input files
+;cm_fn=layer_path+'\'+'niger_CM_v22_%crop_VGT'                    ;bsq, byte, crop mask pixel value= 0-200 DM (for % coverage ranging from 0 to 100%)
+;maxFapar_fn=pheno_path+'\'+'maxv1'
+;dept_fn=layer_path+'\'+'dep'
+;
+;;yield_data
+;yield_fn=yield_path+'\'+'dep-year-yield.csv'
+;
+;;define pheno product image chracteristics (from VGT data at 1000 m resolution)
+;ns = 1600                    ; number of samples
+;nl = 900                     ; number of lines
+;nb = 14                      ; number of years  from 2009
+;                   
+;ret=rs_yield_regress()
+;PRINT, 'Processing completed'
+;END

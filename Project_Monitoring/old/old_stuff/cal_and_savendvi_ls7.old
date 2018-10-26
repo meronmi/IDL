@@ -1,0 +1,44 @@
+FUNCTION cal_and_saveNDVI_LS7, in_dir, out_dir, fn_LS_before, LMIN, LMAX, SZA, ESUN_b3, ESUN_b4, d
+PRINT, 'LS7, Bands 3 and 4 of the file assumed to be red and nir' 
+
+;calibrate and save Ls7 NDVI
+ns_LSb = FIX(read_info('samples', in_dir + '\' + remove_ext_from_fn(fn_LS_before) + '.hdr'))
+nl_LSb = FIX(read_info('lines', in_dir + '\' + remove_ext_from_fn(fn_LS_before) + '.hdr'))
+nb_LSb = FIX(read_info('bands', in_dir + '\' + remove_ext_from_fn(fn_LS_before) + '.hdr'))
+dt_LSb = FIX(read_info('data type', in_dir + '\' + remove_ext_from_fn(fn_LS_before) + '.hdr'))
+LSb = MAKE_ARRAY(ns_LSb, nl_LSb, nb_LSb, TYPE = dt_LSb)
+OPENR, lun, in_dir + '\' + fn_LS_before, /GET_LUN
+READU, lun, LSb
+FREE_LUN, lun
+QCALMAX = FLTARR(6)*0+255
+QCALMIN = FLTARR(6)*0+1
+
+b4_rad = ((LMAX[3] - LMIN[3])/(QCALMAX[3]-QCALMIN[3])) * (LSb[*,*,3]-QCALMIN[3]) + LMIN[3]
+b3_rad = ((LMAX[2] - LMIN[2])/(QCALMAX[2]-QCALMIN[2])) * (LSb[*,*,2]-QCALMIN[2]) + LMIN[2]
+b4_r = (!PI * b4_rad * d^2) / (FLOAT(ESUN_b4) * COS(SZA*!DtoR))
+b3_r = (!PI * b3_rad * d^2) / (FLOAT(ESUN_b3) * COS(SZA*!DtoR))
+
+ndvi = (b4_r - b3_r) / (b4_r + b3_r)
+fn_ndvi = 'TOArefNDVI_' + remove_ext_from_fn(fn_LS_before)
+OPENW, lun, out_dir + '\' + fn_ndvi + '.img', /GET_LUN
+WRITEU, lun, ndvi
+FREE_LUN, lun
+map_info = read_info('map info', in_dir + '\' + remove_ext_from_fn(fn_LS_before) + '.hdr')
+coord_info = read_info('coordinate system string', in_dir + '\' + remove_ext_from_fn(fn_LS_before) + '.hdr')
+dt_LSb = SIZE(ndvi)
+dt_LSb = dt_LSb[-2]
+OPENW, lun, out_dir + '\' + fn_ndvi + '.hdr', /GET_LUN
+PRINTF, lun, 'ENVI'
+PRINTF, lun, 'samples = ' + STRTRIM(ns_LSb,2)
+PRINTF, lun, 'lines = ' + STRTRIM(nl_LSb,2)
+PRINTF, lun, 'bands = 1'
+PRINTF, lun, 'data type  = ' + STRTRIM(dt_LSb,2)
+PRINTF, lun, 'file type = ENVI Standard'
+PRINTF, lun, 'interleave = bsq'
+PRINTF, lun, 'byte order = 0'
+PRINTF, lun, 'map info = ' + map_info
+PRINTF, lun, 'coordinate system string = ' +coord_info
+FREE_LUN, lun
+RETURN, ndvi
+
+END

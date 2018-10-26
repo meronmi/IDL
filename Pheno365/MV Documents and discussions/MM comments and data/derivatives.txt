@@ -1,0 +1,13 @@
+a0+a1*0.5*(tanh((x-a2)*a3)+1)+a4*0.5*(tanh((x-a5)*a6)+1)-a4
+
+f'''x = 2*a4*a6^3*sech(a6*x-a5*a6)^2*tanh(a6*x-a5*a6)^2-a4*a6^3*sech(a6*x-a5*a6)^4+2*a1*a3^3*sech(a3*x-a2*a3)^2*tanh(a3*x-a2*a3)^2-a1*a3^3*sech(a3*x-a2*a3)^4 
+
+b=a5*ab6
+c=a2*a3
+2*a4*a6^3*sech(a6*x-b)^2*tanh(a6*x-b)^2-a4*a6^3*sech(a6*x-b)^4+2*a1*a3^3*sech(a3*x-c)^2*tanh(a3*x-c)^2-a1*a3^3*sech(a3*x-c)^4 
+
+f(4)x = -4*a4*a6^4*sech(a6*x-a5*a6)^2*tanh(a6*x-a5*a6)^3+8*a4*a6^4*sech(a6*x-a5*a6)^4*tanh(a6*x-a5*a6)-4*a1*a3^4*sech(a3*x-a2*a3)^2*tanh(a3*x-a2*a3)^3+8*a1*a3^4*sech(a3*x-a2*a3)^4*tanh(a3*x-a2*a3) 
+
+b=a5*ab6
+c=a2*a3
+f(4)x = -4*a4*a6^4*sech(a6*x-b)^2*tanh(a6*x-b)^3+8*a4*a6^4*sech(a6*x-b)^4*tanh(a6*x-b)-4*a1*a3^4*sech(a3*x-c)^2*tanh(a3*x-c)^3+8*a1*a3^4*sech(a3*x-c)^4*tanh(a3*x-c) 

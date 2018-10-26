@@ -1,0 +1,29 @@
+PHENO NRT
+go in the Glimpse bat dir (X:\Active Projects\HOT SPOT SYSTEM\SPIRITSpheno\glimpse\GLIMbat) and run GLIMset.BAT to set the env vaiaribles
+
+
+
+
+
+
+
+
+
+
+
+
+
+             p1   p2                                         3 4 5        6 7                                          8 9 10 11                                  12 13 14 15             6 7 8 9 0 1
+PHENOdef.exe 2013 U:\data\cid-bulk15\TS\42002\WAF\ACT\S10\vt 6 i 20130401 0 U:\data\cid-bulk15\TS\42002\WAF\HIS\S10\vt 6 i 15 Y:\remote_sensing\vgt\ref\pheno "" "" "" E:\TEST_NRT\vt 1 1 0 1 0 0
+
+
+
+
+PHENO OVER EUROPE (repeat all years), possibly boundaries are treated differently
+for year 1999, 1998 would be needed and LTA will be used instead
+for year 2015, the still missing dekads of 2016 are replaced by LTA as well
+NDVI images (smoothed) are in: U:\data\cid-bulk15\TS\21103\EUR\GIO\DER\IMA\S10\NDVIs\ACTUAL
+LTA is located here: U:\data\cid-bulk15\TS\21103\EUR\GIO\DER\IMA\S10\NDVIs\HIS
+
+             p1   p2                                                              3 4 5 6 7                                                            8 9 10 11                       12 13 14 15                       6 7 8 9 0 1
+PHENOdef.exe 2013 U:\data\cid-bulk15\TS\21103\EUR\GIO\DER\IMA\S10\NDVIs\ACTUAL\vt 6 k 0 0 U:\data\cid-bulk15\TS\21103\EUR\GIO\DER\IMA\S10\NDVIs\HIS\vt 6 k 15 E:\Pheno_Europe\pheno_eu "" "" "" E:\Pheno_Europe\RES\vtph 1 1 1 1 1 0

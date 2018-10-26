@@ -1,0 +1,8 @@
+COMMON cb_options, use_lomb, vrbs, pltres, column, line, resume_from_save, MNGS
+;* use_lomb {integer}: set 1 to use Lomb-Scarg periodogram, 0 to use autocorrelation
+;* vrbs {integer}: set 0 supprees all 'print' and report files
+;* pltres {integer}: set 0 supprees all plots
+;* column {integer}: column of the image, for debug
+;* line {integer}:   line of the image, for debug
+;* resume_from_save {integer}: ;set to ne if the work was interrupted and yo want to start from last line (line is saved and will be restored)
+;* MNGS minimum number of found seasons to declar that the seasonality exists

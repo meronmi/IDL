@@ -1,0 +1,3 @@
+1. fare un Ws nuovo con switch WS e facendo copy settings
+2. switchare sul nuovo WS e cancellare il default project
+3. fare import dei projects che stavano sotto la WS da copiare

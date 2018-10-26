@@ -1,0 +1,3 @@
+COMMON cb_ladgen, llidf_a, llidf_b, llidf
+
+;Variables used to store last ladgen input/outputs to avoid running ladgen again and again

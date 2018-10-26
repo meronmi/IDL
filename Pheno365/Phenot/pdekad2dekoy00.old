@@ -1,0 +1,24 @@
+;Function pdekad2dekoy00, pdekad
+;;as Function pdekad2dekoy, but compute dekoy from year 0 dek 0 and return the year
+;
+;res=FLTARR(N_ELEMENTS(pdekad),2)
+;
+;;Store the position of -999 to treat them properly
+;ind999=WHERE(pdekad EQ -999, count999)
+;;Transform pdekad from start_dekoy to pdekad from 1
+;;and express it as dekad of the year (which is MOD 36)
+;dekoy=(pdekad+1) MOD 36
+;;mod 36 eq 0 has to be dek 36
+;ind=WHERE(dekoy EQ 0, count)
+;IF (count GT 0) THEN dekoy[ind] = 36
+;;report -999 in their original position
+;IF (count999 NE 0) THEN dekoy[ind999] = -999
+;;compute calendar year of each dekad if required
+;res[*,0] = dekoy
+;indf=WHERE(FINITE(pdekad) EQ 1, countf)
+;indn=WHERE(FINITE(pdekad) EQ 0, countn)
+;res[indf,1] = FLOOR((pdekad[indf])/36.0)
+;IF (countn NE 0) THEN res[indn,1]=!VALUES.F_NAN
+;
+;RETURN, res
+;END

@@ -1,0 +1,2 @@
+http://mcst.gsfc.nasa.gov/calibration/parameters
+ftp://mcst.hbsss-sigma.com/pub/permanent/MCST/PFM_L1B_LUT_4-30-99/L1B_RSR_LUT/

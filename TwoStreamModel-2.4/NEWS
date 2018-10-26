@@ -1,0 +1,17 @@
+FILE:
+	NEWS
+
+PURPOSE:
+	recall changes made to the 2stream package
+
+HISTORY:
+October, 19th 2005: Version 2.4: For release on http://fapar.jrc.it
+August, 22nd  2005: Version 2.3: Coupling equations change in 2stream.c. They are physically equivalent
+                    but seems to be numerically more accurate, especially when it comes to absorption.
+August, 17th  2005: Version 2.2: Low level routines and Simple2streamF are available in Fortran90.
+August, 10th  2005: Low level radiation routines are moved to a specific subdirectory rad2s/
+		    The Simple2stream executable is added to the distribution.
+May, 29th     2005: Towards a full model with all radiative components.
+March, 10th   2005: Implementation of the -o flag for the output format.
+		    Users can also specify the wished model (--xxx flag).
+October, 15th 2004: First (internal) version: only a black-background model.

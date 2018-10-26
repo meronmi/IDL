@@ -1,0 +1,129 @@
+FUNCTION generate_acqJULDAY_image, mvc, path, ns, nl, year_start, dek_start, $
+                                year_stop, dek_stop, fn_out
+;  Purpose:
+;     To build a bil image containing the acquisition date referring
+;     to the RS indicator (e.g., FAPAR) made with a MVC rule (mvc set to 1),
+;     or mean. The acuisition day in the month is reported in the *g files
+;     The output is the Julian day. Each year is considered made up of 
+;     365 or 366 days (so considering leap years)
+;     The output is  thus JULDAY(month,day,year).
+;     To get the DOY from this number x:
+;     x = JULDAY(12,31,1999)
+;     CALDAT, x, Monthx, Dayx, Yearx
+;     doy = x - JULDAY(12, 31, Yearx-1)
+
+;  Outcome:
+;     Bil file
+
+;  Usage:
+;     rc = generate_acqDOY_image(mvc, path, ns, nl, year_start, dek_start, year_stop, dek_stop, fn_out)
+
+;  Input parameters: None.
+;      mvc: 0 is Mean/Median composite, 1 if Maximum Value Composite
+;           if the mean/median comp is used, the dek is assigned to the 5th day of the dekad
+;      path: full path where vtTTYYg (TT is dekad, YY is year) files are stored,
+;            output bile file will be placed here as well
+;      ns: number of samples
+;      nl: number of lines
+;      year_start: YYYY of first image (e.g., 1998 for VGT)
+;      dek_start: TT of first image (e.g., 10 for VGT)
+;      year_stop: YYYY of last image (
+;      dek_stop: TT of last image
+;      fn_out: output bil file name without path, it will be stored in path
+;  Output parameters: None.
+
+;  Return values:
+;     0: Normal completion.
+;    10: Error in finding/reading the files
+
+;  Examples:
+;      print, generate_acqJULDAY_image(1,'Q:\Extended_HoA\raw G', 4538, 4124, 1998, 10, 2012, 24, 'up1224_bil_ExtHoA_g')
+;      print, generate_acqJULDAY_image(0,'Q:\Extended_HoA\raw G', 4538, 4124, 1998, 10, 2012, 24, 'up1224_bil_ExtHoA_g')
+
+;  History:
+;     Version 1.0: Michele Meroni, 07/08/2012
+
+; compute the number of band of the bil file
+nb = (year_stop - year_start - 1) * 36 + (36 - dek_start + 1) + dek_stop
+;check that there are enough file in path
+res = FILE_SEARCH(path, '*g.hdr',   COUNT = nfiles)
+IF (nfiles LT nb) THEN RETURN, 10
+
+mat_in = LONARR(ns, nl, nb) ;LONARR consuming too much
+tmp = BYTARR(ns, nl)
+IF (mvc EQ 1) THEN BEGIN
+  ;read the g files (all in a huge matrix for the time being
+  dek = dek_start
+  year = year_start
+  FOR i = 0, nb - 1 DO BEGIN
+    TT = dek
+    IF (dek LT 10) THEN TT = '0' + STRTRIM(dek,2) ELSE TT = STRTRIM(dek,2)
+    YY = STRMID(STRTRIM(year,2), 2, 2) 
+    fn = path + '\' + 'vt' + YY + TT + 'g.img' 
+    IF (FILE_TEST(fn) NE 1) THEN STOP 
+    OPENR, lun, fn, /GET_LUN
+    READU, lun, tmp
+    FREE_LUN, lun
+    indNaN = WHERE(tmp GT 250, countNaN)
+    ;mat_in[*,*,i] = tmp
+    month = CEIL(dek / 3.0)
+    tmpL = JULDAY(month, tmp, year)
+    tmpL[indNaN] = -999 
+    mat_in[*,*,i] = tmpL
+    dek0 = dek
+    year0 = year
+    dek = dek + 1
+    IF (dek GT 36) THEN BEGIN
+      dek = 1
+      year = year + 1
+    ENDIF
+  ENDFOR
+  ;check that all file were considered
+  IF (dek0 NE dek_stop) OR (year0 NE year_stop) THEN STOP
+ENDIF ELSE BEGIN
+   FOR i = 0, nb - 1 DO BEGIN
+    TT = dek
+    YY = STRTRIM(year,2)
+    IF ((dek MOD 3) EQ 1) THEN day = 5
+    IF ((dek MOD 3) EQ 2) THEN day = 15
+    IF ((dek MOD 3) EQ 0) THEN BEGIN
+      ;retrive the month
+      month = CEIL(dek / 3.0)
+      ;retrieve the first JUL day of the dekad
+      frst_jul = JULDAY(month, 20, year)
+      ;retrieve the last JUL day of the dekad (last of the month)
+      lst_jul = JULDAY(month+1, 1, year)-1
+      CALDAT, frst_jul, month, day, year
+      day = day + FLOOR((lst_jul - frst_jul)/2)
+    ENDIF
+    mat_in[*,*,i] = JULDAY(month, day, year)
+    ENDFOR 
+    dek = dek + 1
+    IF (dek GT 36) THEN BEGIN
+      dek = 1
+      year = year + 1
+    ENDIF  
+ENDELSE 
+   
+;process the bil output
+OPENW, lun, path + '\' + fn_out, /GET_LUN
+FOR l = 0, nl -1 DO BEGIN
+  WRITEU, lun, mat_in[*,l,*]
+ENDFOR
+FREE_LUN, lun
+;write hdr
+OPENW, lun, path + '\' + fn_out + '.hdr', /GET_LUN
+PRINTF, lun,'ENVI'
+PRINTF, lun,'description = JULIAN DAY OF ACQUISITION'
+PRINTF, lun,'samples ='+STRCOMPRESS(ns)
+PRINTF, lun,'lines   ='+STRCOMPRESS(nl)
+PRINTF, lun,'bands   ='+STRCOMPRESS(nb)
+PRINTF, lun,'header offset = 0'
+PRINTF, lun,'file type = ENVI Standard'
+PRINTF, lun,'data type = 3'
+PRINTF, lun,'interleave = bil'
+PRINTF, lun,'sensor type = VGT'
+PRINTF, lun,'byte order = 0'
+FREE_LUN, lun
+RETURN, 0                          
+END        

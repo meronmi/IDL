@@ -1,0 +1,11 @@
+Ciao Michele,
+Find attached the program to cumulate per pixel (and calculate maximum). I tested it for GIMMS and SPOT and works well: 
+for MODIS/eMODIS some parameters have to be set/changed, but should be straightforward. 
+We don't need it for cumulating z-scores (because that is after aggregation). 
+For GIMMS (and MODIS) I divide the cumulated NDVI by 10 to keep results in Integer. 
+All places where during the season once the noData-value is hit, are set to 0 in the results. 
+On the same ftp-address I have put the results for GIMMS. 
+And also I added a folder SPOT with the same results and the filtered NDVI time series for Kenya (
+requires updating with new images still). You see that finally I decided to put all seasons in a single output-file.
+Cheers!
+Anton

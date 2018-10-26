@@ -1,0 +1,28 @@
+COMMON cb_job, input_dir, data_fname, output_dir, nskip, ntot, run_dir, $
+   wantplotfapar, wantplotlomb, wantplotacorr, wantplotgs, ltdr_check
+
+;  The following variables are initially set in phenot_p0_job:
+;     - input_dir {string}: Name of the directory containing the input FAPAR
+;       time series data file.
+;     - data_fname {string}: Name of the input FAPAR time series data file to
+;       process.
+;     - output_dir {string}: Name of the directory containing the output files
+;       (results, graphs and diagnostics for this run).
+;     - nskip {integer}: Number of initial years to skip in the original data
+;       set.
+;     - ntot {integer}: Number of years to process: A value equal to or larger
+;       than the number of years actually present in the file implies taking
+;       all available years (beyond the number of skipped years). A value
+;       smaller than the number of years actually present in the file implies
+;       acquiring and processing only those years.
+;     - wantplotfapar {integer}: Set to a non-zero value to request a plot of
+;       the FAPAR record.
+;     - wantplotlomb {integer}: Set a non-zero value to request a plot of the
+;       Lomb normalized periodogram.
+;     - wantplotacorr {integer}: Set to a non-zero value to request a plot of
+;       the autocorrelograms of the FAPAR record.
+;     - wantplotgs {integer}: Set to a non-zero value to request a plot of the
+;       individual growing seasons, both on screen and in output files.
+;  The following variables are initially set in phenot_p1:
+;     - run_dir {string}: Output subdirectory containing the results,
+;       diagnostics and graphics files for this run.

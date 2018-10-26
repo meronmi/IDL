@@ -1,0 +1,31 @@
+;  Purpose:
+;     XXX
+;
+;  Outcome:
+;     XXX
+;
+;  Restriction:
+;     XXXX
+;
+;  Usage:
+;     XXXX
+
+;  Input parameters: 
+;     XXX
+
+;  Output parameters: None.
+;     XXX
+
+;  Return values:
+;     XXXX
+;
+;  Author:
+;     Michele Meroni, michele.meroni@jrc.ec.europa.eu
+;     
+;  History:
+;     Version 01:  Beta version, May 2011
+;     Version 0.1: Beta version with comments added for CNCT, November 2011
+
+;  References:
+;     none
+;

@@ -1,0 +1,429 @@
+PRO plot_inversion_results, doPlotSpectra, eps_wlimOnOff, $
+                            satR1, satR2, satR3, satR4, satR5, satR6, satR7, satObsJD, $
+                            tJD, ec_JD, INDJD0_EDDY, $
+                            ecmwf_globrad, ec_globrad, $
+                            ecmwf_prec, ec_prec, $
+                            sim, ec_GDD, ec_gpp_mds, ret, sYear, prosailvar
+;PLOTS
+;compute ndvi to locate max used in the graphics
+val = MAX((satR2-satR1)/(satR2+satR1), ind_max_ndvi_obs, /NAN)
+;
+;common settings
+dummy = LABEL_DATE(DATE_FORMAT=['%D/%N','%Y'])
+fs = 8 ;font size
+lp = [1.2, 1] ;legend position
+dm = [1000,900]  ;dimensions of the window
+xminor = 2        ;monor ticks between majors
+;base_layout = [3,3]
+xrange = [MIN(tJD), MAX(tJD)]
+
+; y is divided in 0, 0.3, 0.6 so to leave some space above
+; x is in 0, 0.33, .66
+;       0.0  0.6   0.33  0.9 
+; Position of the upper left graph, all others graphs are positioned base on this 
+;       xmin  ymin  xmax  ymax
+
+xmin = 0.05
+ymin = 0.66 ;(0.605)
+pos0 = [xmin, ymin,xmin+0.24, ymin+0.24] ;0.24 in width and height
+
+;Radiation, ECMWF
+pos = pos0
+yrange =[0,MAX([ecmwf_globrad, ec_globrad], /NAN)+2.0]
+gh_radg_ecmwf = PLOT (tJD, ecmwf_globrad, YTITLE='ecmwf_globrad (MJ m-2)', XTITLE='Time', COLOR = 'black', XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', XMINOR=xminor, $
+  FONT_SIZE = fs, POSITION=pos, DIMENSIONS=dm, XRANGE=xrange, Name='ECMWF', YRANGE=yrange)
+;Radiation, Eddy flux data
+gh_radg_eddy = PLOT (ec_JD, ec_globrad, COLOR = 'red', OVERPLOT = 1, Name='Eddy',  YRANGE=yrange)
+gh_tmp = PLOT([satObsJD[ind_max_ndvi_obs], satObsJD[ind_max_ndvi_obs]], yrange, COLOR='grey', OVERPLOT=1, YRANGE=yrange)
+!null = LEGEND(target=[gh_radg_ecmwf, gh_radg_eddy], /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=lp, /RELATIVE, $
+  SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.1, TRANSPARENCY=100)
+
+;Precipitation, ECMWF
+pos = pos0
+pos[[0,2]]= pos[[0,2]] + 0.33
+yrange =[0,MAX([ecmwf_prec, ec_prec], /NAN)+2.0]
+gh_rain_ecmwf = PLOT (tJD, ecmwf_prec, YTITLE='Precipitation (mm)', XTITLE='Time', COLOR = 'black', XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', XMINOR=xminor, $
+  FONT_SIZE = fs, POSITION=pos, /CURRENT, XRANGE=xrange, Name='ECMWF', YRANGE=yrange)
+;Precipitation, Eddy flux data
+gh_rain_eddy = PLOT (ec_JD, ec_prec, COLOR = 'red', OVERPLOT = 1, Name='Eddy', YRANGE=yrange)
+gh_tmp = PLOT([satObsJD[ind_max_ndvi_obs], satObsJD[ind_max_ndvi_obs]], yrange, COLOR='grey', OVERPLOT=1);, YRANGE=yrange)
+!null = LEGEND(target=[gh_rain_ecmwf, gh_rain_eddy], /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=lp, /RELATIVE, $
+  SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.1, TRANSPARENCY=100)
+  
+;Temperature, ECMWF
+;pos[[0,2]]= pos[[0,2]] + 0.33
+;yrange =[0,MAX([sim.gdd, ec_GDD], /NAN)+2.0]
+;gh_gdd_ecmwf = PLOT (tJD, sim.gdd, YTITLE='GDD', XTITLE='Time', COLOR = 'black', XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', XMINOR=xminor, $
+;  FONT_SIZE = fs, POSITION=pos, /CURRENT, XRANGE=xrange, YRANGE=yrange, Name='ECMWF')
+;;Temperature, Eddy flux data
+;gh_gdd_eddy = PLOT (ec_JD[indJD0_eddy:*], ec_GDD, COLOR = 'red', OVERPLOT = 1, Name='Eddy')
+;gh_tmp = PLOT([satObsJD[ind_max_ndvi_obs], satObsJD[ind_max_ndvi_obs]], yrange, COLOR='grey', OVERPLOT=1);, YRANGE=yrange)
+;!null = LEGEND(target=[gh_gdd_ecmwf, gh_gdd_eddy], /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=lp, /RELATIVE, $
+;  SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.1, TRANSPARENCY=100)
+
+pos[[0,2]]= pos[[0,2]] + 0.33
+yrange =[0,MAX([sim.gdd, ec_GDD], /NAN)+2.0]
+IF (eps_wlimOnOff EQ 1) THEN axSt = 1 ELSE axSt = 2
+gh_gdd_ecmwf = PLOT (tJD, sim.gdd, YTITLE='GDD (°C)', XTITLE='Time', COLOR = 'black', AXIS_STYLE = axSt, $
+  XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', XMINOR=xminor, $
+  FONT_SIZE = fs, POSITION=pos, /CURRENT, XRANGE=xrange, YRANGE=yrange, Name='ECMWF')
+;Temperature, Eddy flux data
+gh_gdd_eddy = PLOT (ec_JD[indJD0_eddy:*], ec_GDD, COLOR = 'red', OVERPLOT = 1, Name='Eddy',  AXIS_STYLE = axSt)
+gh_tmp = PLOT([satObsJD[ind_max_ndvi_obs], satObsJD[ind_max_ndvi_obs]], yrange, COLOR='grey', OVERPLOT=1,  AXIS_STYLE = axSt);, YRANGE=yrange)
+a_y = AXIS('x', TARGET = gh_gdd_ecmwf, LOCATION = "top",GRIDSTYLE="none", MAJOR=0, MINOR=0)
+IF (eps_wlimOnOff EQ 1) THEN BEGIN 
+  yrange = [0.0, MAX(sim.eps_s)+1.0]
+  gh_bewm_ecmwf = PLOT (tJD, sim.eps_s, XTITLE='Time', COLOR = 'blue', AXIS_STYLE = 0, $
+    XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', XMINOR=xminor, $
+    FONT_SIZE = fs, POSITION=pos, /CURRENT, XRANGE=xrange, YRANGE=yrange, Name='Eeps_s')
+  a_bewm = AXIS('y', TARGET = gh_bewm_ecmwf, LOCATION = [max(gh_gdd_eddy.xrange),0,0], TICKFONT_SIZE = fs, TEXTPOS = 1, $
+      TITLE = 'Eps_s', YRANGE=yrange)
+  !null = LEGEND(target=[gh_gdd_ecmwf, gh_gdd_eddy, gh_bewm_ecmwf], /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=lp, /RELATIVE, $
+      SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.1, TRANSPARENCY=100)
+ENDIF ELSE BEGIN
+  !null = LEGEND(target=[gh_gdd_ecmwf, gh_gdd_eddy], /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=lp, /RELATIVE, $
+  SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.1, TRANSPARENCY=100)
+ENDELSE
+
+;LAI/FAPAR
+pos = pos0
+pos[[1,3]]= pos[[1,3]] - 0.3
+yrange =[0.0,1.0]
+gh_fa  = PLOT (tJD, sim.fa,  YTITLE='fAPAR', XTITLE='Time', COLOR = 'black', AXIS_STYLE = 1,$ 
+               XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', XMINOR=xminor, $
+               FONT_SIZE = fs, POSITION=pos, /CURRENT, $
+               NAME = 'FAPAR', XRANGE=xrange, YRANGE=yrange)
+gh_tmp = PLOT([satObsJD[ind_max_ndvi_obs], satObsJD[ind_max_ndvi_obs]], yrange, COLOR='grey', OVERPLOT=1, YRANGE=yrange, AXIS_STYLE = 1)
+a_y = AXIS('x', TARGET = gh_fa, LOCATION = "top",GRIDSTYLE="none", MAJOR=0, MINOR=0)
+yrange =[0.0,MAX(sim.lai, /NAN)+1.0]
+gh_lai  = PLOT (tJD, sim.lai,  COLOR = 'green', NAME = 'LAI', AXIS_STYLE = 0, $
+                XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', $
+                FONT_SIZE = fs, POSITION=pos, YRANGE = [0,6], XRANGE=xrange, /CURRENT)
+a_lai = AXIS('y', TARGET = gh_lai, LOCATION = [max(gh_lai.xrange),0,0], TICKFONT_SIZE = fs, TEXTPOS = 1, $
+             TITLE = 'LAI (m2 m-2)', YRANGE=yrange)
+
+!null = LEGEND(target=[gh_fa, gh_lai], /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=lp, /RELATIVE, $
+  SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.1, TRANSPARENCY=100)
+;dLAI
+pos[[0,2]]= pos[[0,2]] + 0.33
+yrange =[0,MAX([sim.dlai,sim.dlai_senescent])+0.1]
+gh_dlai = PLOT (tJD, sim.dlai, YTITLE='dLAI, LAI_senescent (m2 m-2)', XTITLE='Time', COLOR = 'green', XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', XMINOR=xminor, $
+  FONT_SIZE = fs, POSITION=pos, /CURRENT, NAME = 'newLAI', XRANGE=xrange, YRANGE=yrange, AXIS_STYLE = 1)
+gh_senlai  = PLOT (tJD, sim.dlai_senescent,  COLOR = 'black', OVERPLOT=1, NAME = 'senLAI', AXIS_STYLE = 1)
+gh_tmp = PLOT([satObsJD[ind_max_ndvi_obs], satObsJD[ind_max_ndvi_obs]], yrange, COLOR='grey', OVERPLOT=1, $
+  YRANGE=yrange, AXIS_STYLE = 1)
+a_y = AXIS('x', TARGET = gh_dlai, LOCATION = "top",GRIDSTYLE="none", MAJOR=0, MINOR=0)
+
+;Partitioning
+gh_P1 = PLOT (tJD, sim.P1, COLOR = 'blue', XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', XMINOR=xminor, $
+  FONT_SIZE = fs, POSITION=pos, /CURRENT, NAME = 'P1', YRANGE=[0,1.2], XRANGE=xrange, AXIS_STYLE = 0)
+a_P1 = AXIS('y', TARGET = gh_P1, LOCATION = [max(gh_dlai.xrange),0,0], TICKFONT_SIZE = fs, TEXTPOS = 1, $
+    TITLE = 'partitioning (into leaf)', YRANGE=[0,1.2])
+!null = LEGEND(target=[gh_dlai, gh_senlai, gh_P1], /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=lp, /RELATIVE, $
+  SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.1, TRANSPARENCY=100)
+
+;GPP
+;GPP modeled
+pos[[0,2]]= pos[[0,2]] + 0.33
+
+yrange =[-0.25,MAX([sim.gpp,ec_gpp_mds], /NAN)+0.1]
+gh_modgpp = PLOT (tJD, sim.gpp, YTITLE='GPP (gC m-2 d-1)', XTITLE='Time', COLOR = 'black', XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', XMINOR=xminor, $
+  FONT_SIZE = fs, POSITION=pos, /CURRENT, NAME = 'simGPP', XRANGE=xrange, YRANGE=yrange)
+;gh_cnpp  = PLOT (tJD, sim.cnpp,  COLOR = 'green', OVERPLOT=1, NAME = 'NPP')
+;GPP meaured (Eddy data)
+gh_obsgpp = PLOT (ec_JD, ec_gpp_mds, OVERPLOT=1, COLOR = 'red', $
+  NAME = 'obsGPP(mds)')
+gh_tmp = PLOT([satObsJD[ind_max_ndvi_obs], satObsJD[ind_max_ndvi_obs]], yrange, COLOR='grey', OVERPLOT=1, YRANGE=yrange)
+!null = LEGEND(target=[gh_modgpp, gh_obsgpp], /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=lp, /RELATIVE, $
+  SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.1, TRANSPARENCY=100)
+
+;GPP scatterplot
+pos = pos0
+pos[[1,3]]= pos[[1,3]] - 0.6
+ec_gpp = ec_gpp_mds
+sim_gpp = sim.gpp[0:N_ELEMENTS(ec_gpp_mds)-1]
+;set negative gpp to NaN
+indfin = WHERE(FINITE(ec_gpp_mds))
+ineg = WHERE(ec_gpp_mds[indfin] LT 0.0, nneg)
+IF (nneg GT 0) THEN ec_gpp_mds[indfin[ineg]] = !VALUES.F_NAN
+indfin = WHERE(FINITE(ec_gpp_mds))
+;find where i smax NDVI
+indmax = WHERE(ec_JD EQ satObsJD[ind_max_ndvi_obs])
+yrange=[0, MAX([ec_gpp_mds, sim_gpp], /NAN)+0.2]
+;plot black until the ndvi max
+gh_scatterB = PLOT(ec_gpp_mds[0:indmax], sim_gpp[0:indmax], SYMBOL='+', LINESTYLE='none', XRANGE=yrange, YRANGE=yrange, $
+                   FONT_SIZE = fs, POSITION=pos, /CURRENT, NAME = 't<=t_max_ndvi', XTITLE='EC GPP (>=0)', YTITLE='sim GPP')
+;and grey afterwards sim.gpp[0:N_ELEMENTS(ec_gpp_mds)-1]
+gh_scatterA = PLOT(ec_gpp_mds[indmax+1:*], sim_gpp[indmax+1:*], SYMBOL='+', LINESTYLE='none', $
+  FONT_SIZE = fs, COLOR='grey', OVERPLOT=1, XRANGE=yrange, YRANGE=yrange, NAME = 't>t_max_ndvi')
+gh_11 = PLOT(yrange, yrange, OVERPLOT=1, COLOR='green', NAME='1:1 line', LINESTYLE='--') 
+b = REGRESS(ec_gpp_mds[indfin], sim_gpp[indfin], CONST = a, CORRELATION = r)   
+;trick to avoid plotting outside
+x0=(0.0-a)/b[0]
+x1=(yrange[1]-a)/b[0]
+IF (x0 LT 0) THEN x0=0.0
+yreg = a+b[0]*[x0,x1]  
+;gh_reg = PLOT(yrange, yreg, OVERPLOT=1, COLOR='blue', NAME='Reg, R2='+STRTRIM(r^2,2), YRANGE=yrange) 
+gh_reg = PLOT([x0,x1], yreg, OVERPLOT=1, COLOR='blue', NAME='Reg, R2='+STRTRIM(r^2,2), YRANGE=yrange)
+!null = LEGEND(target=[gh_scatterB, gh_scatterA], /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=[0.92, 1.02], /RELATIVE, $
+  SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.03, TRANSPARENCY=100)
+tmp = STRING(r^2, FORMAT='(F4.2)', /PRINT)
+th1 = TEXT(pos[2]-0.1, pos[1]+0.03, '$R^2$='+tmp, COLOR='blue');, TARGET=gh_scatterB, /DATA) 
+;NDVI
+pos[[0,2]]= pos[[0,2]] + 0.33
+;Simulated Modis NDVI
+Red_sim = REFORM(sim.ModRef[0,*])
+Nir_sim = REFORM(sim.ModRef[1,*])
+gh_sim_ndvi = PLOT (tJD, ((Nir_sim-Red_sim)/(Nir_sim+Red_sim)), YTITLE='MODIS NDVI', XTITLE='Time', COLOR = 'black', XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', XMINOR=xminor, $
+  FONT_SIZE = fs, POSITION=pos, /CURRENT, NAME = 'simNDVI', YRANGE=[0.0,1.0], XRANGE=xrange)
+;Observed MODIS NDVI
+;obs_ndvi = (Nir_obs-Red_obs)/(Nir_obs+Red_obs)
+
+gh_obs_ndvi = PLOT (satObsJD, ((satR2-satR1)/(satR2+satR1)), COLOR = 'red', OVERPLOT = 1, $
+  NAME = 'obsNDVI', LINESTYLE='none', SYMBOL='+', SYM_SIZE = 0.7)
+legTarget = [gh_sim_ndvi, gh_obs_ndvi]
+;Observed MODIS SIWSI
+doPlotSiwsi = 0
+IF (doPlotSiwsi EQ 1) THEN BEGIN
+  gh_obs_siwsi = PLOT (satObsJD, ((satR6-satR2)/(satR6+satR2)), COLOR = 'blue', OVERPLOT = 1, $
+    NAME = 'obsSIWSI', LINESTYLE='none', SYMBOL='+', SYM_SIZE = 0.7)
+  gh_tmp = PLOT([satObsJD[ind_max_ndvi_obs], satObsJD[ind_max_ndvi_obs]], COLOR='grey', [0,1], OVERPLOT=1)
+  legTarget = [legTarget, gh_obs_siwsi]
+ENDIF 
+!null = LEGEND(target=legTarget, /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=lp, /RELATIVE, $
+  SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.1, TRANSPARENCY=100)
+;Refletcances
+pos[[0,2]]= pos[[0,2]] + 0.33
+yrange = [0, MAX(sim.ModRef[*,*]+0.1, /NAN)]
+sim_names =  'sim '+STRTRIM(FLOOR(datacentwl_MODIST_7b()),2) ;['R1','R2','R3','R4','R5','R6','R7']
+obs_names =  'obs'+STRARR(7)
+gh_sim1 = PLOT(tJD, sim.ModRef[0,*], YTITLE='R', XTITLE='Time', COLOR = 'red', XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', XMINOR=xminor, $
+  FONT_SIZE = fs, POSITION=pos, MARGIN=margin, /CURRENT, NAME = sim_names[0], YRANGE=yrange, XRANGE=xrange)
+gh_obs1 = PLOT (satObsJD, satR1, NAME= obs_names[0], $
+  LINESTYLE='none', SYMBOL='o', SYM_SIZE = 0.3, COLOR = 'red', OVERPLOT=1)
+
+gh_sim2 = PLOT(tJD, sim.ModRef[1,*], COLOR = 'blue', OVERPLOT = 1, NAME = sim_names[1])
+gh_obs2 = PLOT (satObsJD, satR2, NAME= obs_names[1], $
+  LINESTYLE='none', SYMBOL='o', SYM_SIZE = 0.3, COLOR = 'blue', OVERPLOT=1)
+
+gh_sim3 = PLOT(tJD, sim.ModRef[2,*], COLOR = 'black', OVERPLOT = 1, NAME = sim_names[2])
+gh_obs3 = PLOT (satObsJD, satR3, NAME= obs_names[2], $
+  LINESTYLE='none', SYMBOL='o', SYM_SIZE = 0.3, COLOR = 'black', OVERPLOT=1)
+
+gh_sim4 = PLOT(tJD, sim.ModRef[3,*], COLOR = 'green', OVERPLOT = 1, NAME = sim_names[3])
+gh_obs4 = PLOT (satObsJD, satR4, NAME= obs_names[3], $
+  LINESTYLE='none', SYMBOL='o', SYM_SIZE = 0.3, COLOR = 'green', OVERPLOT=1)
+
+gh_sim5 = PLOT(tJD, sim.ModRef[4,*], COLOR = 'grey', OVERPLOT = 1, NAME = sim_names[4])
+gh_obs5 = PLOT (satObsJD, satR5, NAME= obs_names[4], $
+  LINESTYLE='none', SYMBOL='o', SYM_SIZE = 0.3, COLOR = 'grey', OVERPLOT=1)
+
+gh_sim6 = PLOT(tJD, sim.ModRef[5,*], COLOR = 'magenta', OVERPLOT = 1, NAME = sim_names[5])
+gh_obs6 = PLOT (satObsJD, satR6, NAME= obs_names[5], $
+  LINESTYLE='none', SYMBOL='o', SYM_SIZE = 0.3, COLOR = 'magenta', OVERPLOT=1)
+
+gh_sim7 = PLOT(tJD, sim.ModRef[6,*], COLOR = 'orange', OVERPLOT = 1, NAME = sim_names[6])
+gh_obs7 = PLOT (satObsJD, satR7, NAME= obs_names[6], $
+  LINESTYLE='none', SYMBOL='o', SYM_SIZE = 0.3, COLOR = 'orange', OVERPLOT=1)
+gh_tmp = PLOT([satObsJD[ind_max_ndvi_obs], satObsJD[ind_max_ndvi_obs]], yrange, COLOR='grey', OVERPLOT=1, YRANGE=yrange)
+!null = LEGEND(target=[gh_sim1,gh_obs1,gh_sim2,gh_obs2,gh_sim3,gh_obs3,gh_sim4,gh_obs4,$
+                       gh_sim5,gh_obs5,gh_sim6,gh_obs6,gh_sim7,gh_obs7], /AUTO_TEXT_COLO, FONT_SIZE = fs-1, $
+                       POSITION=[0.28, 1.05], /RELATIVE, $
+                       SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.02, TRANSPARENCY=100)
+;Add inversion info
+th0 = TEXT(0.01, 0.98, 'Year: '+ STRTRIM(sYear,2)+ '; '+ ret.info_mpfit[0], FONT_SIZE = 10)
+th1 = TEXT(0.01, 0.96, ret.info_mpfit[1])
+th2 = TEXT(0.01, 0.94, ret.info_mpfit[2])
+th3 = TEXT(0.01, 0.92, ret.info_mpfit[3])
+
+
+;*************************************************************************************
+;*************************************************************************************
+;*************************************************************************************
+IF (doPlotSpectra EQ 1) THEN BEGIN
+   ;plot reflectances (sim and obs) for the second obs, @ max obs NDVI, second last
+   lp = [0.05, 1] ;legend position
+   dm = [900,900]  ;dimensions of the window
+   xmin = 0.05
+   ymin = 0.7 ;(0.605)
+   sw = 0.02  ;sample width
+   pos0 = [xmin, ymin,xmin+0.25, ymin+0.25] ;0.24 in width and height   
+   cwl = datacentwl_MODIST_7b()
+   wlspec = FLOAT(INDGEN(2101) + 400)
+   xtitle = 'Wl (nm)'
+   ytitle = 'R (-)'
+   sym_size = .7
+   
+   pos = pos0
+   ind = 0  
+   obs = [satR1[ind],satR2[ind],satR3[ind],satR4[ind],satR5[ind],satR6[ind], satR7[ind]]
+   sims = sim.ModRef[*,ind]
+   yrange = [0, MAX([obs, sims])+0.05]
+   gh_obs = PLOT (cwl, obs, YTITLE=ytitle, XTITLE=xtitle, $
+     FONT_SIZE = fs, POSITION=pos, DIMENSIONS=dm, LINESTYLE='none', SYMBOL='o', SYM_SIZE = sym_size, $
+     YRANGE=yrange, COLOR = 'red', Name='obs1', TITLE = 'Obs1', WINDOW_TITLE= 'Year: '+ STRTRIM(sYear,2))
+   gh_sim = PLOT (cwl, sims, YTITLE=ytitle, XTITLE=xtitle, $
+     FONT_SIZE = fs, LINESTYLE='none', SYMBOL='+', SYM_SIZE = sym_size, $
+     YRANGE=yrange, COLOR = 'black', Name='sim1', OVERPLOT=1)
+   gh_rsoil = PLOT(wlspec,proSailVar.rsoil, COLOR='grey', OVERPLOT=1, NAME='rsoil')
+   gh_tmp = PLOT([645,645], [0,1], YRANGE=yrange, COLOR='red', OVERPLOT=1)
+   gh_tmp = PLOT([858,858], [0,1], YRANGE=yrange, COLOR='black', OVERPLOT=1)  
+   gh_tmp = PLOT([1640,1640], [0,1], YRANGE=yrange, COLOR='grey', OVERPLOT=1)
+   !null = LEGEND(target=[gh_obs, gh_sim, gh_rsoil], /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=lp, /RELATIVE, $
+     SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=sw, TRANSPARENCY=100, HORIZONTAL_ALIGNMENT = 'LEFT')
+   
+   pos = pos0
+   pos[[0,2]]= pos[[0,2]] + 0.33
+   ind = 1
+   obs = [satR1[ind],satR2[ind],satR3[ind],satR4[ind],satR5[ind],satR6[ind], satR7[ind]]
+   sims = sim.ModRef[*,ind]
+   yrange = [0, MAX([obs, sims])+0.05]
+   gh_obs = PLOT (cwl, obs, YTITLE=ytitle, XTITLE=xtitle, $
+     FONT_SIZE = fs, POSITION=pos, DIMENSIONS=dm, LINESTYLE='none', SYMBOL='o', SYM_SIZE = sym_size, $
+     YRANGE=yrange, COLOR = 'red', Name='obs2', TITLE = 'Obs2', /CURRENT)
+   gh_sim = PLOT (cwl, sims, YTITLE=ytitle, XTITLE=xtitle, $
+     FONT_SIZE = fs, LINESTYLE='none', SYMBOL='+', SYM_SIZE = sym_size, $
+     YRANGE=yrange, COLOR = 'black', Name='sim2', OVERPLOT=1)
+   gh_rsoil = PLOT(wlspec,proSailVar.rsoil, COLOR='grey', OVERPLOT=1, NAME='rsoil')
+   gh_tmp = PLOT([645,645], [0,1], YRANGE=yrange, COLOR='red', OVERPLOT=1)
+   gh_tmp = PLOT([858,858], [0,1], YRANGE=yrange, COLOR='black', OVERPLOT=1)
+   gh_tmp = PLOT([1640,1640], [0,1], YRANGE=yrange, COLOR='grey', OVERPLOT=1)
+   !null = LEGEND(target=[gh_obs, gh_sim, gh_rsoil], /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=lp, /RELATIVE, $
+     SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=sw, TRANSPARENCY=100, HORIZONTAL_ALIGNMENT = 'LEFT')
+   
+   pos[[0,2]]= pos[[0,2]] + 0.33
+   ind = 2
+   obs = [satR1[ind],satR2[ind],satR3[ind],satR4[ind],satR5[ind],satR6[ind], satR7[ind]]
+   sims = sim.ModRef[*,ind]
+   yrange = [0, MAX([obs, sims])+0.05]
+   gh_obs = PLOT (cwl, obs, YTITLE=ytitle, XTITLE=xtitle, $
+     FONT_SIZE = fs, POSITION=pos, DIMENSIONS=dm, LINESTYLE='none', SYMBOL='o', SYM_SIZE = sym_size, $
+     YRANGE=yrange, COLOR = 'red', Name='obs3', TITLE = 'Obs3', /CURRENT)
+   gh_sim = PLOT (cwl, sims, YTITLE=ytitle, XTITLE=xtitle, $
+     FONT_SIZE = fs, LINESTYLE='none', SYMBOL='+', SYM_SIZE = sym_size, $
+     YRANGE=yrange, COLOR = 'black', Name='sim3', OVERPLOT=1)
+   gh_rsoil = PLOT(wlspec,proSailVar.rsoil, COLOR='grey', OVERPLOT=1, NAME='rsoil')
+   gh_tmp = PLOT([645,645], [0,1], YRANGE=yrange, COLOR='red', OVERPLOT=1)
+   gh_tmp = PLOT([858,858], [0,1], YRANGE=yrange, COLOR='black', OVERPLOT=1)
+   gh_tmp = PLOT([1640,1640], [0,1], YRANGE=yrange, COLOR='grey', OVERPLOT=1)
+   !null = LEGEND(target=[gh_obs, gh_sim, gh_rsoil], /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=lp, /RELATIVE, $
+     SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=sw, TRANSPARENCY=100, HORIZONTAL_ALIGNMENT = 'LEFT')
+   
+   pos = pos0
+   pos[[1,3]]= pos[[1,3]] - 0.33
+   indsim = WHERE(tJD EQ satObsJD[ind_max_ndvi_obs - 1])
+   obs = [satR1[ind_max_ndvi_obs - 1],satR2[ind_max_ndvi_obs - 1],satR3[ind_max_ndvi_obs - 1],satR4[ind_max_ndvi_obs - 1],satR5[ind_max_ndvi_obs - 1],satR6[ind_max_ndvi_obs - 1], satR7[ind_max_ndvi_obs - 1]]
+   sims = sim.ModRef[*,indsim]
+   yrange = [0, MAX([obs, sims])+0.05]
+   gh_obs = PLOT (cwl, obs, YTITLE=ytitle, XTITLE=xtitle, $
+     FONT_SIZE = fs, POSITION=pos, DIMENSIONS=dm, LINESTYLE='none', SYMBOL='o', SYM_SIZE = sym_size, $
+     YRANGE=yrange, COLOR = 'red', Name='posMax-1 obs', TITLE = 'posMax-1', /CURRENT)
+   gh_sim = PLOT (cwl, sims, YTITLE=ytitle, XTITLE=xtitle, $
+     FONT_SIZE = fs, LINESTYLE='none', SYMBOL='+', SYM_SIZE = sym_size, $
+     YRANGE=yrange, COLOR = 'black', Name='posMax-1 sim', OVERPLOT=1)
+   gh_rsoil = PLOT(wlspec,proSailVar.rsoil, COLOR='grey', OVERPLOT=1, NAME='rsoil')
+   gh_tmp = PLOT([645,645], [0,1], YRANGE=yrange, COLOR='red', OVERPLOT=1)
+   gh_tmp = PLOT([858,858], [0,1], YRANGE=yrange, COLOR='black', OVERPLOT=1)
+   gh_tmp = PLOT([1640,1640], [0,1], YRANGE=yrange, COLOR='grey', OVERPLOT=1)
+   !null = LEGEND(target=[gh_obs, gh_sim, gh_rsoil], /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=lp, /RELATIVE, $
+     SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=sw, TRANSPARENCY=100, HORIZONTAL_ALIGNMENT = 'LEFT')
+
+   pos[[0,2]]= pos[[0,2]] + 0.33
+
+   indsim = WHERE(tJD EQ satObsJD[ind_max_ndvi_obs])
+
+   obs = [satR1[ind_max_ndvi_obs],satR2[ind_max_ndvi_obs],satR3[ind_max_ndvi_obs],satR4[ind_max_ndvi_obs],satR5[ind_max_ndvi_obs],satR6[ind_max_ndvi_obs], satR7[ind_max_ndvi_obs]]
+   sims = sim.ModRef[*,indsim]
+   yrange = [0, MAX([obs, sims])+0.05]
+   gh_obs = PLOT (cwl, obs, YTITLE=ytitle, XTITLE=xtitle, $
+     FONT_SIZE = fs, POSITION=pos, DIMENSIONS=dm, LINESTYLE='none', SYMBOL='o', SYM_SIZE = sym_size, $
+     YRANGE=yrange, COLOR = 'red', Name='posMax obs', TITLE = 'posMax', /CURRENT)
+   gh_sim = PLOT (cwl, sims, YTITLE=ytitle, XTITLE=xtitle, $
+     FONT_SIZE = fs, LINESTYLE='none', SYMBOL='+', SYM_SIZE = sym_size, $
+     YRANGE=yrange, COLOR = 'black', Name='posMax sim', OVERPLOT=1)
+   gh_rsoil = PLOT(wlspec,proSailVar.rsoil, COLOR='grey', OVERPLOT=1, NAME='rsoil')
+   gh_tmp = PLOT([645,645], [0,1], YRANGE=yrange, COLOR='red', OVERPLOT=1)
+   gh_tmp = PLOT([858,858], [0,1], YRANGE=yrange, COLOR='black', OVERPLOT=1)
+   gh_tmp = PLOT([1640,1640], [0,1], YRANGE=yrange, COLOR='grey', OVERPLOT=1)
+   !null = LEGEND(target=[gh_obs, gh_sim, gh_rsoil], /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=lp, /RELATIVE, $
+     SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=sw, TRANSPARENCY=100, HORIZONTAL_ALIGNMENT = 'LEFT')
+     
+   pos[[0,2]]= pos[[0,2]] + 0.33
+   indsim = WHERE(tJD EQ satObsJD[ind_max_ndvi_obs+1])
+   obs = [satR1[ind_max_ndvi_obs + 1],satR2[ind_max_ndvi_obs + 1],satR3[ind_max_ndvi_obs + 1],satR4[ind_max_ndvi_obs + 1],satR5[ind_max_ndvi_obs + 1],satR6[ind_max_ndvi_obs + 1], satR7[ind_max_ndvi_obs + 1]]
+   sims = sim.ModRef[*,indsim]
+   yrange = [0, MAX([obs, sims])+0.05]
+   gh_obs = PLOT (cwl, obs, YTITLE=ytitle, XTITLE=xtitle, $
+     FONT_SIZE = fs, POSITION=pos, DIMENSIONS=dm, LINESTYLE='none', SYMBOL='o', SYM_SIZE = sym_size, $
+     YRANGE=yrange, COLOR = 'red', Name='posMax+1 obs', TITLE = 'posMax+1', /CURRENT)
+   gh_sim = PLOT (cwl, sims, YTITLE=ytitle, XTITLE=xtitle, $
+     FONT_SIZE = fs, LINESTYLE='none', SYMBOL='+', SYM_SIZE = sym_size, $
+     YRANGE=yrange, COLOR = 'black', Name='posMax+1 sim', OVERPLOT=1)
+   gh_rsoil = PLOT(wlspec,proSailVar.rsoil, COLOR='grey', OVERPLOT=1, NAME='rsoil')
+   gh_tmp = PLOT([645,645], [0,1], YRANGE=yrange, COLOR='red', OVERPLOT=1)
+   gh_tmp = PLOT([858,858], [0,1], YRANGE=yrange, COLOR='black', OVERPLOT=1)
+   gh_tmp = PLOT([1640,1640], [0,1], YRANGE=yrange, COLOR='grey', OVERPLOT=1)
+   !null = LEGEND(target=[gh_obs, gh_sim, gh_rsoil], /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=lp, /RELATIVE, $
+     SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=sw, TRANSPARENCY=100, HORIZONTAL_ALIGNMENT = 'LEFT')
+   pos[[0,2]]= pos[[0,2]] + 0.33
+   
+   pos = pos0
+   pos[[1,3]]= pos[[1,3]] - 0.66
+   ind = N_ELEMENTS(satR1)-1
+   obs = [satR1[ind],satR2[ind],satR3[ind],satR4[ind],satR5[ind],satR6[ind], satR7[ind]]
+   sims = sim.ModRef[*,ind]
+   yrange = [0, MAX([obs, sims])+0.05]
+   gh_obs = PLOT (cwl, obs, YTITLE=ytitle, XTITLE=xtitle, $
+     FONT_SIZE = fs, POSITION=pos, DIMENSIONS=dm, LINESTYLE='none', SYMBOL='o', SYM_SIZE = sym_size, $
+     YRANGE=yrange, COLOR = 'red', Name='last obs', TITLE = 'last obs', /CURRENT)
+   gh_sim = PLOT (cwl, sims, YTITLE=ytitle, XTITLE=xtitle, $
+     FONT_SIZE = fs, LINESTYLE='none', SYMBOL='+', SYM_SIZE = sym_size, $
+     YRANGE=yrange, COLOR = 'black', Name='last sim', OVERPLOT=1)
+   gh_rsoil = PLOT(wlspec,proSailVar.rsoil, COLOR='grey', OVERPLOT=1, NAME='rsoil')
+   gh_tmp = PLOT([645,645], [0,1], YRANGE=yrange, COLOR='red', OVERPLOT=1)
+   gh_tmp = PLOT([858,858], [0,1], YRANGE=yrange, COLOR='black', OVERPLOT=1)
+   gh_tmp = PLOT([1640,1640], [0,1], YRANGE=yrange, COLOR='grey', OVERPLOT=1)
+   !null = LEGEND(target=[gh_obs, gh_sim, gh_rsoil], /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=lp, /RELATIVE, $
+     SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=sw, TRANSPARENCY=100, HORIZONTAL_ALIGNMENT = 'LEFT')
+     
+   pos[[0,2]]= pos[[0,2]] + 0.33
+   ind = ind - 1
+   obs = [satR1[ind],satR2[ind],satR3[ind],satR4[ind],satR5[ind],satR6[ind], satR7[ind]]
+   sims = sim.ModRef[*,ind]
+   yrange = [0, MAX([obs, sims])+0.05]
+   gh_obs = PLOT (cwl, obs, YTITLE=ytitle, XTITLE=xtitle, $
+     FONT_SIZE = fs, POSITION=pos, DIMENSIONS=dm, LINESTYLE='none', SYMBOL='o', SYM_SIZE = sym_size, $
+     YRANGE=yrange, COLOR = 'red', Name='second last obs', TITLE = 'second last obs', /CURRENT)
+   gh_sim = PLOT (cwl, sims, YTITLE=ytitle, XTITLE=xtitle, $
+     FONT_SIZE = fs, LINESTYLE='none', SYMBOL='+', SYM_SIZE = sym_size, $
+     YRANGE=yrange, COLOR = 'black', Name='second last sim', OVERPLOT=1)
+   gh_rsoil = PLOT(wlspec,proSailVar.rsoil, COLOR='grey', OVERPLOT=1, NAME='rsoil')
+   gh_tmp = PLOT([645,645], [0,1], YRANGE=yrange, COLOR='red', OVERPLOT=1)
+   gh_tmp = PLOT([858,858], [0,1], YRANGE=yrange, COLOR='black', OVERPLOT=1)
+   gh_tmp = PLOT([1640,1640], [0,1], YRANGE=yrange, COLOR='grey', OVERPLOT=1)
+   !null = LEGEND(target=[gh_obs, gh_sim, gh_rsoil], /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=lp, /RELATIVE, $
+     SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=sw, TRANSPARENCY=100, HORIZONTAL_ALIGNMENT = 'LEFT')
+     
+   pos[[0,2]]= pos[[0,2]] + 0.33
+   
+   ind = ind - 2
+   obs = [satR1[ind],satR2[ind],satR3[ind],satR4[ind],satR5[ind],satR6[ind], satR7[ind]]
+   sims = sim.ModRef[*,ind]
+   yrange = [0, MAX([obs, sims])+0.05]
+   gh_obs = PLOT (cwl, obs, YTITLE=ytitle, XTITLE=xtitle, $
+     FONT_SIZE = fs, POSITION=pos, DIMENSIONS=dm, LINESTYLE='none', SYMBOL='o', SYM_SIZE = sym_size, $
+     YRANGE=yrange, COLOR = 'red', Name='third last obs', TITLE = 'third last obs', /CURRENT)
+   gh_sim = PLOT (cwl, sims, YTITLE=ytitle, XTITLE=xtitle, $
+     FONT_SIZE = fs, LINESTYLE='none', SYMBOL='+', SYM_SIZE = sym_size, $
+     YRANGE=yrange, COLOR = 'black', Name='third last sim', OVERPLOT=1)
+   gh_rsoil = PLOT(wlspec,proSailVar.rsoil, COLOR='grey', OVERPLOT=1, NAME='rsoil')
+   gh_tmp = PLOT([645,645], [0,1], YRANGE=yrange, COLOR='red', OVERPLOT=1)
+   gh_tmp = PLOT([858,858], [0,1], YRANGE=yrange, COLOR='black', OVERPLOT=1)
+   gh_tmp = PLOT([1640,1640], [0,1], YRANGE=yrange, COLOR='grey', OVERPLOT=1)
+   !null = LEGEND(target=[gh_obs, gh_sim, gh_rsoil], /AUTO_TEXT_COLOR, FONT_SIZE = fs-1, POSITION=lp, /RELATIVE, $
+     SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=sw, TRANSPARENCY=100, HORIZONTAL_ALIGNMENT = 'LEFT')  
+ENDIF
+
+
+
+END

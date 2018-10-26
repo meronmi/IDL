@@ -1,0 +1,23 @@
+1.1	1.4	10	! MIN, MAX, nsteps: GREEN LEAF N_g, structure coefficient
+30.0	30.0	1	! MIN, MAX, nsteps: GREEN LEAF Cab_g, chlorophyll content (µg.cm-2) 
+20.0	20.0	1	! MIN, MAX, nsteps: GREEN LEAF Car_g, carotenoid content (µg.cm-2)
+0.0	0.0	1	! MIN, MAX, nsteps: GREEN LEAF Cbrown_g, brown pigment content (arbitrary units)
+0.015	0.015	1    	! MIN, MAX, nsteps: GREEN LEAF Cw_g, EWT (cm)
+0.010	0.010	1	! MIN, MAX, nsteps: GREEN LEAF Cm_g, LMA (g.cm-2)
+1.2	1.2	1	! MIN, MAX, nsteps: BROWN LEAF N_b		     structure coefficient
+30.0	30.0	1	! MIN, MAX, nsteps: BROWN LEAFCab_b		chlorophyll content (µg.cm-2) 
+10.0	10.0	1	! MIN, MAX, nsteps: BROWN LEAFCar_b		carotenoid content (µg.cm-2)
+0.0	0.0	1	! BROWN LEAFCbrown_b	brown pigment content (arbitrary units)
+0.015	0.015	1	! BROWN LEAFCw_b		EWT (cm)
+0.009	0.009	1	! BROWN LEAFCm_b		LMA (g.cm-2)
+4.0	4.0	1     	! lai     LAI (greg: 4.0)
+55.0	55.0	1    	! mli     Mean Leaf Inclination angle (90 is erctophile, 5 is plagophile)
+0.1	0.10	1	! hot     hot spot effect parameter, estimated as ratio of average leaf width and canopy height 
+0.5	0.5	1    	! fB      fraction brown lai (greg: 0.2)
+0.0	0.0	1    	! diss    dissociation factor [0,1]
+0.8	0.8	1    	! Cv      vertical crown coverage [0,1]
+0.1	0.1	1    	! zeta    tree shape factor (diameter/height)
+0.5	0.5	1	! psoil	  soil linear coefficient  	 
+0.0	0.0	1  	! tto     VZA
+55.0	55.0	1  	! tts     SZA
+0.0	360.0	100 	! psi     RAA

@@ -1,0 +1,64 @@
+PRO simForwMod_handler
+  ;Set the parameter of the model and run the model in forward mode
+  
+  ;FIXED PARAMETERS
+  globrad2par=0.48    ;conversion factor from Global radiation to PAR
+  tb = 0              ;base temperature to comput degree days (dDD = MAX(Tair-Tb, 0)
+  
+  ;POTENTIALLY FREE parameter during current season simulation
+  DOY0 = 50           ;DOY at which the LAI is laiDOY0, it is used to approximate emergence of the crop
+  
+  ;POTENTIALLY FIXED or tuned on a longer time series (for example 5 years)
+  SLA=0.02            ;Specific Leaf Area(m2 g-1)
+  gamma=0.0           ;respiration coefficient (1/10), re=gamma*GPP
+  ;k_lb = 0.54         ;coefficient of Lambert-Beer fapar=1-exp(-k_lai*lai)
+  laiDOY0 = 0.05      ;LAI value at DOY0, emergence
+  eps_max=2.54        ;(kgDM/GJ_PAR = gDM MJ-1) source: MARSOP3-LOTII interim report
+  ;the following have to be modelled
+  c = 768.0           ;parameters controlling the leaf lifespan in DegDays, c acts as a base life span
+  d = 0               ;d controls the lifespan (j) a function of the degree days at emergence, e.g.
+                      ;if d if GT 0 it makes the leaves emerging later to live longer
+  a = 0.02            ;coefficients a and b for partitioning into leaves (as in Maas, 1993), spring wheat
+  b = 0.004
+  
+  ;PROSAIL PARAMETERS (Sailh parametrization as in Guo et al, 2014, IJRS
+  proSailVar = { $
+    Cab    : 35.0d    ,$      ;; chlorophyll content (µg.cm-2) (0-100 ug cm-2)
+    Car    : 0.0d     ,$; 12.0d    ;; carotenoid content (µg.cm-2)  (0-25 ug cm-2)
+    Cbrown : 0.0d     ,$;0.5d     ;; brown pigment content (0-1 arbitrary units)
+    Cw     : 0.01     ,$;0.015d   ;; EWT (cm) - Equivalent water thickness (0-0.05 cm)
+    Cm     : 0.009d   ,$;0.1d     ;; LMA (g.cm-2) - leaf mass per unit leaf area (0-0.02 g cm-2)
+    Ns     : 1.5d     ,$;; structure coefficient (1-3 dimensionless)
+    ;use a and be parameter instead (Michele, 4 July 2014) angl   = 57.0d    ;; average leaf angle (°)
+    ; % LIDFa LIDF parameter a, which controls the average leaf slope
+    ; % LIDFb LIDF parameter b, which controls the distribution's bimodality
+    ; % LIDF type     a      b
+    ; % Planophile    1      0
+    ; % Erectophile   -1     0
+    ; % Plagiophile   0      -1
+    ; % Extremophile  0      1
+    ; % Spherical     -0.35  -0.15
+    ; % Uniform       0      0
+    ; %   requirement: |LIDFa| + |LIDFb| <= 1
+    lidf_a : -0.35    ,$
+    lidf_b : -0.15    ,$
+    lai    : 0.0d    ,$;; leaf area index
+    hspot  : 0.01d    ,$;; hot spot
+    tts    : 30.0d    ,$;; solar zenith angle (°)
+    tto    : 10.0d     ,$;; observer zenith angle (°)
+    psi    : 0.0d     ,$;; azimuth (°)
+    psoil  : 1.0d}     ; soil coefficient
+    
+    
+    
+    
+  ;INPUT VARIABLES
+  ; Constant PAR for n days, first day must be DOY0
+  n = 100
+  globrad=FLTARR(n)*0.0+200.0  ;(GJ ha-1 d-1)  200 maybe for Italy, 2000 for Kenya
+  
+  ; Constant T
+  tair=FLTARR(n)*0.0+20        ;(°Celsius)
+  
+  PRINT, simForwMod(DOY0, laiDOY0, SLA, eps_max, gamma, c, d, a, b, globrad, globrad2par, tair, tb, proSailVar)
+END

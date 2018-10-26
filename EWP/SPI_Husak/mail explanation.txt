@@ -1,0 +1,36 @@
+i've coded up the SPI in IDL using a conditional gamma distribution accounting for the probability of no rainfall.  
+
+i'm not sure if it is standard to post functions to this group (i'm a bit of a newbie), but you can email me or reply here and i can send you the code.
+
+gh
+
+greg husak
+ucsb department of geography 
+
+
+hi michele,
+
+sharing the code is no problem, i'm happy to have other people use it and have attached it here.  i'm not an expert programmer, so please forgive any "amateur" syntax or approaches to the problem.  i am a functional programmer, and this function does work. 
+
+if "rain" is an array of rainfall values (let's say september rainfall for the last 30 years) you can calculate the SPI by doing:
+SPI = precip_2_spi_gh(rain)
+and SPI will be a float array with the same dimensions as rain.  
+
+the default is that you need at least 12 non-zero values for the function to calculate the SPI.  you can adjust this by using the optional argument "MIN_POSOBS".  so let's say you only had 15 years of data and wanted to calculate the SPI if you had at least 10 years of non-zero, you could run SPI = precip_2_spi_gh(rain,MIN_POSOBS=10).  
+
+as a quick example of how i have used this, if "indata" is a rainfall "cube" for a specific month with dimensions (NX, NY, NYEARS), then i would create a matching SPI cube using code like this:
+s = SIZE(indata,/DIMENSIONS)
+spi = FLTARR(s)
+for x=0,s[0]-1 do begin
+   if (x MOD 100) eq 0 then print,x,systime()
+   for y=0,s[1]-1 do begin
+      spi[x,y,*] = precip_2_spi_gh(indata[x,y,*]) 
+   endfor
+endfor
+
+let me know if you have any questions, and thanks for the inquiry.
+
+gh
+
+
+

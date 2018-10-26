@@ -1,0 +1,5 @@
+COMMON cb_prospect_last_parameters, lCab,lCar,lCbrown,lCw,lCm,lNs,lRN,lTN
+
+;Variables used to store tha PROSPECT parameters (lCab,lCar,lCbrown,lCw,lCm,lNs) and output (lRN,lTN) 
+;used in the most recent run.
+;This is done to avoid calling the PROSPECT model again and again without changing the parameters 

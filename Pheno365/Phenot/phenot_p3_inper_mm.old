@@ -1,0 +1,234 @@
+FUNCTION phenot_p3_inper_mm
+
+;  Purpose:
+;     To determine the start and end of the period within
+;     which the next growing season in the FAPAR record
+;     will be sought.
+
+;  Outcome:
+;     The next growing season should be located in the
+;     sub-period [inistart, iniend].
+
+;  Usage:
+;     rc = phenot_p3_inper()
+
+;  Input parameters: None.
+
+;  Output parameters: None.
+
+;  Return values:
+;     0: Normal completion.
+;     1: The minimum and the maximum values coincide within
+;        the period under investigation, or the value of
+;        the minimum is above the median of the FAPAR
+;        distribution: This period may contain an
+;        incomplete growing season.
+
+;  Remarks:
+;     The variable iniend must be initialized before
+;     calling this routine; it is done in gs6t_p3_strt.pro
+;     the first time around, and each successive search for
+;     a growing season should reset iniend to a new value,
+;     whether or not the search was successful.
+
+;  History:
+;     This is an updated version of Version: 6.0, Release: 2.0, of the routine
+;     gs6t_p3_inper.pro developed on 2008-03-02.
+
+;  Include the necessary common block(s):
+@cb_job.comm
+@cb_in.comm
+@cb_stat.comm
+@cb_frst.comm
+@cb_pdhtf.comm
+;MM+
+@cb_optstat.comm
+;  Initialize the return code:
+retcode = 0
+
+;  Set the start of the period in which to search for the
+;  next growing season as the end of the previous growing
+;  period, and ensure that this is not a missing value: If
+;  so, select the first successive valid value:
+;IF (numgs GT 0) THEN BEGIN
+;   inistart = gsstop [numgs - 1]
+;;   IF (diag GT 2) THEN BEGIN
+;;      PRINTF, diag_unit, 'inistart has been reset to ', $
+;;         inistart
+;;   ENDIF
+;   IF ((fapar [inistart] LT ibel) OR $
+;      (fapar [inistart] GT iabo)) THEN BEGIN
+;      REPEAT BEGIN
+;         inistart = inistart + 1
+;      ENDREP UNTIL ((fapar [inistart] GE ibel) AND $
+;         (fapar [inistart] LE iabo))
+;;      IF (diag GT 2) THEN BEGIN
+;;         PRINTF, diag_unit, 'fapar [inistart] is missing.'
+;;         PRINTF, diag_unit, 'inistart is now ', inistart
+;;      ENDIF
+;   ENDIF
+;ENDIF ELSE BEGIN
+;   inistart = FIX(iniend)
+;;   IF (diag GT 2) THEN BEGIN
+;;      PRINTF, diag_unit, 'inistart has been set initially to ', $
+;;         inistart
+;;   ENDIF
+;ENDELSE
+
+
+;MM+ use inistart provided by p3_pdhf_mm
+ IF ((fapar [inistart] LT ibel) OR $
+      (fapar [inistart] GT iabo)) THEN BEGIN
+      REPEAT BEGIN
+         inistart = inistart + 1
+      ENDREP UNTIL ((fapar [inistart] GE ibel) AND $
+         (fapar [inistart] LE iabo))
+ ENDIF
+;      IF (diag GT 2) THEN BEGIN
+;         PRINTF, diag_unit, 'fapar [inistart] is missing.'
+;         PRINTF, diag_unit, 'inistart is now ', inistart
+;      ENDIF
+
+;  First, identify the sub-period that is likely to contain
+;  the local maximum for the next growing season. The
+;  specification of this sub-period is rather sensitive,
+;  especially when there are two growing seasons per year,
+;  with widely differing amplitudes. Too short a search
+;  period may miss a season, while too long a period may
+;  result in skipping a season and immediately
+;  characterizing the subsequent one. The following values
+;  have been found satisfactory so far:
+;MM+ double the length if the previous optimization failed (failed in cb_optstat)
+;CASE ngspy OF
+;   1: BEGIN
+;         CASE period OF
+;            30: timper = 8
+;            10: timper = 24
+;            1: timper = 240
+;         ENDCASE
+;      END
+;   2: BEGIN
+;         CASE period OF
+;            30: timper = 5
+;            10: timper = 14
+;            1: timper = 140
+;         ENDCASE
+;      END
+;ENDCASE
+
+alpha=1.5
+if failed eq 1 then alpha=2.0
+CASE ngspy OF
+   1: BEGIN
+         CASE period OF
+            30: timper = alpha*8
+            10: timper = alpha*24
+            1: timper = alpha*240
+         ENDCASE
+      END
+   2: BEGIN
+         CASE period OF
+            30: timper = alpha*5
+            10: timper = alpha*14
+            1: timper = alpha*140
+         ENDCASE
+      END
+ENDCASE
+;MM-
+;MM+
+iniend = inistart + timper
+iniend_beyond_end=0
+if (iniend gt (npts - 1)) then iniend_beyond_end=1 
+iniend = FIX(MIN([iniend, npts - 1]))
+;iniend = inistart + timper
+;iniend = FIX(MIN([iniend, npts - 1]))
+;MM-
+;IF (diag GT 2) THEN BEGIN
+;   PRINTF, diag_unit, 'Period to look for next GS maximum = [' + $
+;      STRTRIM (STRING (inistart), 2) + ', ' + $
+;      STRTRIM (STRING (iniend), 2) + ']'
+;ENDIF
+
+;  Second, search for the maximum valid value in the fapar
+;  series within that sub-period:
+goodfi = WHERE((fapar [inistart:iniend] GE ignore_below [0]) AND $
+   (fapar [inistart:iniend] LE ignore_above [0]))
+fmax = MAX(fapar [inistart + goodfi])
+idx = WHERE(fapar [inistart:iniend] EQ fmax)
+fmax_idx = inistart + FIX(idx [0])
+;MM+
+;find the index last non missing observation
+ind_last=goodfi[N_ELEMENTS(goodfi)-1]+inistart
+;MM-
+;IF (diag GT 2) THEN BEGIN
+;   PRINTF, diag_unit, 'Maximum (smoothfapar) located at period ', $
+;      fmax_idx
+;ENDIF
+
+;  If the maximum was found to be at the end of the period,
+;  extend that period by a further half of timper to ensure
+;  it is not actually located immediately outside it, and
+;  search again for the maximum:
+;MM+
+;MM+ IF (fmax_idx EQ iniend) THEN BEGIN
+IF (fmax_idx EQ ind_last) THEN BEGIN
+   iniend = iniend + FIX(timper / 2)
+   ;MM+
+   if (iniend gt (npts - 1)) then iniend_beyond_end=1 
+   iniend = FIX(MIN([iniend, npts - 1]))
+   ;MM-
+   goodfi = WHERE((fapar [inistart:iniend] GE ignore_below [0]) AND $
+      (fapar [inistart:iniend] LE ignore_above [0]))
+   fmax = MAX(fapar [inistart + goodfi])
+   idx = WHERE(fapar [inistart:iniend] EQ fmax)
+   fmax_idx = inistart + FIX (idx [0])
+;   IF (diag GT 2) THEN BEGIN
+;      PRINTF, diag_unit, 'Maximum was found at the end of the search period.'
+;      PRINTF, diag_unit, 'New maximum (smoothfapar) found at period ', $
+;         fmax_idx
+;   ENDIF
+ENDIF
+
+;  Third, identify the sub-period that is likely to contain the local
+;  minimum after the current growing season. This sub-period should be
+;  defined similarly as above, but starting from the newly found
+;  maximum:
+iniend = FIX(fmax_idx) + timper
+;MM+
+if (iniend gt (npts - 1)) then iniend_beyond_end=1 
+iniend = FIX(MIN([iniend, npts - 1]))
+
+;IF (diag GT 2) THEN BEGIN
+;   PRINTF, diag_unit, 'Period to look for next GS minimum = [' + $
+;      STRTRIM (STRING (fmax_idx), 2) + ', ' + $
+;      STRTRIM (STRING (iniend), 2) + ']'
+;ENDIF
+
+;  Fourth, search the subsequent minimum valid value in the smoothed
+;  fapar series within that sub-period:
+goodfi = WHERE((fapar [fmax_idx:iniend] GE ignore_below [0]) AND $
+   (fapar [fmax_idx:iniend] LE ignore_above [0]))
+fmin = MIN(fapar [fmax_idx + goodfi])
+idx = WHERE(fapar [fmax_idx:iniend] EQ fmin)
+fmin_idx = fmax_idx + FIX(idx [0])
+
+;IF (diag GT 2) THEN BEGIN
+;   PRINTF, diag_unit, 'Minimum (smoothfapar) located at period ', $
+;      fmin_idx
+;ENDIF
+
+;  Reset iniend to this final value for this growing season:
+iniend = fmin_idx
+
+;  If the minimum and the maximum coincide in this latter sub-period,
+;  or if the value of the minimum is above the median of the FAPAR
+;  distribution, issue a return code to warn that the period may
+;  contain an incomplete growing season:
+IF ((fmin EQ fmax) OR (fmin GT fap50pctl)) THEN BEGIN
+   retcode = 1
+ENDIF
+;M+
+;print, 'start stop from inper', inistart, iniend
+RETURN, retcode
+
+END

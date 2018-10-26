@@ -1,0 +1,71 @@
+===============================================================================
+EXAMPLE.SPF: Specifications for program PHENOdef (Phenology)
+===============================================================================
+REMARKS:
+- Programs search for lines starting with specific KeyWords (eg. "FENrmf = ...")
+  Other lines (blank or not "KEYWORD = ...") are considered as comments and skipped.
+- The KeyWords are case-insensitive (e.g. "FENrmf" and "FeNrMF" are equivalent.  
+- Important: Most of the KeyWords must be adapted to the nature of the concerned variable (NDVI [-], fAPAR[-], fAPAR [%], ...)
+             This example holds for NDVI.
+- None of the KeyWords may lack. The program does not foresee default values. 
+- Y* (Ymin, Ymax, Y): indicate the physical values of the concerned variable
+  T* (Tmin, Tmax, T): indicate the dekad [1-108] in which these occur
+===============================================================================
+                   Preliminary elimination of pixels without seasonality (Ymax and Ymin are computed over the 36 dekads [37-72] of the central year)
+FEN0Max  = 0.180   If Ymax        < FEN0Max => No seasonality (deserts)
+FEN0Min  = 0.750   If Ymin        > FEN0Min => No seasonality (evergreen)
+FEN0Rng  = 0.075   If (Ymax-Ymin) < FEN0Rng => No seasonality (variability too low)
+-------------------------------------------------------------------------------
+      	           The Yi-profiles of the remaining pixels are smoothed with a weighted, running mean filter (RMF) => Smoothed curve Ys.
+FENrmf   = 0       Half length of the RMF (2=best, 0=skip filtering)
+
+FENw     = 4       All dekadal values get default weight W=1, but the extreme values (MIN/MAX) get weight FENw (best FENw=4)
+                   NB: Tsos/Tmos and Teos (for both seasons) are derived from this smoothed Ys-curve. 
+                       But the corresponding Y-values are extracted from the original Yi-values
+-------------------------------------------------------------------------------
+	           Each smoothed Ys-profile is further decomposed in "segments", i.e. pairs of MIN-MAX or MAX-MIN.
+		   Each cycle or season comprises two subsequent segments: the rising MIN1-MAX plus the descending MAX-MIN2
+	           But even after the RMF-smoothing, pixel profiles can still show many irrelevant cycles.
+	           Via five subsequent tests (all executed iteratively), the irrelevant cycles are searched and eliminated (always in subsequent pairs MIN-MAX or MAX-MIN),
+
+FENdY    = 0.025   Test1: Eliminate segment if the absolute value of its Y-difference             < FENdY    
+FENdT    = 10             AND TOGETHER      if the interval between both extremes (Tmin <-> Tmax) < FENdT (in dekads)
+
+FENmax   = 0.000   Test2: Eliminate all maxima with Ymax < FENmax. Also eliminate the highest neighbouring minimum. NB: Best skip this test via FENmax = 0.0.
+
+                   Test3: The overall Ymin and Ymax are searched (over 3 years) and a threshold is defined: Yt = Ymin + FENratio * (Ymax-Ymin)
+FENratio = 0.200          Eliminate all maxima with Y < Yt. Also eliminate the highest neighbouring minimum. Set FENratio=0 to skip this test.
+
+FENmaxDt = 6       Test4: If interval between 2 maxima   < FENmaxDt (in dekads), remove intermediate minimum and lowest maximum. 
+
+FENextDt = 3       Test5: If interval between 2 extremes < FENextDt (in dekads), remove entire segment.
+-------------------------------------------------------------------------------
+                   At this stage and for most pixels, only one or two maxima (thus seasons) remain within the central year.
+		   But exceptionally there can be more: three or even four.
+	           In that case, the program searches and removes the least relevant maxima (+ highest neighbouring minimum) until at the end only 2 seasons remain.
+		   For each season, the Area is computed below the profile between MIN1-MAX-MIN2. At each iteration, the season with smallest area is eliminated. 
+		   NB: No keywords are needed for this step.
+-------------------------------------------------------------------------------
+                   Two ratios with values between 0.0 and 1.0 (Ymin1/2 are the minima before/after the concerned maximum Ymax)
+FENsos   = 0.15    Tsos is defined as the dekad between Tmin1 and Tmax  where the profile cuts the value Y = Ymin1 + FENsos * (Ymax - Ymin1). Tsos seached LEFTward  from Tmax to Tmin1.
+FENeos   = 0.15    Teos is defined as the dekad between Tmax  and Tmin2 where the profile cuts the value Y = Ymin2 + FENeos * (Ymax - Ymin2). Teos seached RIGHTward from Tmax to Tmin2.
+-------------------------------------------------------------------------------
+FENlDEK  = 1       Express season Lengths (in OUT-IMGs L1, L2, LT0): 0=as % of the year, 1=in dekads.
+-------------------------------------------------------------------------------
+                   Classes k in the optional OUT-classification (OUT-IMG KK0) are defined as: k = (100 * Ns) + (10 * Kmu) + Krg:
+                   - Ns  [0-2] = Seasons in year.
+                   - Kmu [0-4] = INTEGER[(Ya0 - MUlo)/ MUdelt], with Ya0 = Annual mean Y-value       . If Kmu<0 or Kmu>4, it is reset to range [0-4].
+                   - Krg [0-4] = INTEGER[(Yr0 - RGlo)/ RGdelt], with Yr0 = Annual Y-range (Ymax-Ymin). If Krg<0 or Krg>4, it is reset to range [0-4].
+                   Hence, the range of k-classes is limited to 0-244 (byte). The maximum of 244 occurs if Ns=2, Kmu=4 and Krg=4.
+
+                   KeyWord FENkMU contains 2 comma-separated values: MUlo, MUdelt
+                           FENkRG contains 2 comma-separated values: RGlo, RGdelt
+                           
+                   Examples for NDVI [-] with Y-limits between Ylo=-0.08 and Yhi=+0.92:
+                   - "FENkMU= 0.0, 0.20" => There are 5 Kmu classes [0-4]: <0.20, <0.40, <0.60, <0.80 and >= 0.80.
+                   - "FENkMU=-0.1, 0.20" => There are 5 Kmu classes [0-4]: <0.10, <0.30, <0.50, <0.70 and >= 0.70.
+                   - "FENkRG= 0.0, 0.15" => There are 5 Krg classes [0-4]: <0.15, <0.30, <0.45, <0.60 and >= 0.60.
+                   - "FENkRG= 0.0, 0.50" => There are 5 Krg classes [0-4]: <0.50, <1.00, <1.50, <2.00 and >= 2.00 (but only Krg=0/1 occur in practice!)
+                           
+FENkMU   = 0.0, 0.20
+FENkRG   = 0.0, 0.15

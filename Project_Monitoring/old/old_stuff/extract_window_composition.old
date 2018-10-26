@@ -1,0 +1,367 @@
+PRO extract_window_composition
+;this function look at the class composition within the project and look for a square window of the same
+;total area (or nearly) of the prject with similar composition.
+;Similarity id described in terms of RMSE of the various fractional compostions, so a kind of "mean" difference in
+;fractional composition.
+;However as several candidates may have similar and low rmse we want to select the closest.
+;So we state that we can live with a maximum rmse (maxRMSE, e.g. 0.01, 1%) and we get the closest window with an RMSE smaller than
+;maxRMSE   
+
+
+;***************************************************
+;USER DEFINED PART
+debug_use_save = 0; only for debug, set it to 0 otherwise
+max_rmse_dif = 0.01  ;max rmse difference use to serach for a control
+;Note all images must be *.img
+k = 10 ;number of non-overlapping controls to be selected, minimum 1
+target_id = 43    ;id of the project to be investigated
+;exclude_id = -999 ;id of the areas to be exclude in the search for control (it may be a project area we do not
+                  ;want to analyze or an area we belive subjected to changes that we do not want to select as control)
+slc_present = 1   ;set it to 1 if using LS7 with slc problem, and fill the following line
+slc_class = 0     ;class value reserved for LS7 slc missing data, it will be set to 200 (0 creates problem with the search)
+in_dir = 'S:\Actions\FOODSEC\projects\GGW_monitoring\LUISA'
+out_dir = in_dir + '\IDL_outputs'
+;file storing LULC classification
+fn_classification = 'ISO_LS7_20070916_1.img';'ISODATA_Projects38_2007-09-16.img'
+;file storing the project mask (0 where no project, id of the project otherways)
+fn_project_mask = 'project_mas_on_classification15.img';'project_mask_on_classification.img'
+;LS images before and after
+fn_LS_before = 'subset_Landsat7_2007-09-16.img'
+;these muste be retrieved from image properties
+LMAX_LS7 = [293.7,300.9,234.4,241.1,47.57,16.54]
+LMIN_LS7 = [-6.2,-6.4,-5,-5.1,-1,-0.35]
+SZA_LS7 = 90.0 - 61.187893;solar zenith angle (be care, in properties is elevation)
+ddmmyyyy_of_acq = [16,09,2007]  ; date of acquisition
+;These two do not change:
+ESUN_b3_LS7 = 1539;from Chander et al, 2009 (http://www.sciencedirect.com/science/article/pii/S0034425709000169)
+ESUN_b4_LS7 = 1028
+;PRINT,  ddmmyyyy2doy(ddmmyyyy_of_acq[0], ddmmyyyy_of_acq[1], ddmmyyyy_of_acq[2])
+;>259 d_LS7 = 1.00539;computed from doy isuing table 6 of Chander et al, 2009
+fn_LS_after = 'Subset_L8_2015-09-14.img'
+;no need of calibration, it's already TOA reflectance
+;***************************************************
+
+
+
+
+Compile_Opt idl2
+IF (debug_use_save NE 1) THEN BEGIN
+  ;read from table the Sun Earth distance for LS7 correction
+  doy_dist = SE_dist()
+  ind = WHERE(doy_dist[*,0] EQ ddmmyyyy2doy(ddmmyyyy_of_acq[0], ddmmyyyy_of_acq[1], ddmmyyyy_of_acq[2]))
+  d_LS7 = (REFORM(doy_dist[ind, 1]))[0]
+  
+  ;calibrate and save Ls7 NDVI
+  ns_LSb = FIX(read_info('samples', in_dir + '\' + remove_ext_from_fn(fn_LS_before) + '.hdr'))
+  nl_LSb = FIX(read_info('lines', in_dir + '\' + remove_ext_from_fn(fn_LS_before) + '.hdr'))
+  ndvi_before = cal_and_saveNDVI_LS7(in_dir, out_dir, fn_LS_before, $
+                                     LMIN_LS7, LMAX_LS7, SZA_LS7, ESUN_b3_LS7, ESUN_b4_LS7, d_LS7)
+  ;compute Ls8 NDVI                                   
+  ns_LSa = FIX(read_info('samples', in_dir + '\' + remove_ext_from_fn(fn_LS_after) + '.hdr'))
+  nl_LSa = FIX(read_info('lines', in_dir + '\' + remove_ext_from_fn(fn_LS_after) + '.hdr'))
+  ndvi_after = saveNDVI_LS8(in_dir, out_dir, fn_LS_after)
+  ;in_dir, fn_LS_before, LMIN, LMAX, SZA, ESUN_b3, ESUN_b4, d
+  ;Open classification and project mask
+  ns = FIX(read_info('samples', in_dir + '\' + remove_ext_from_fn(fn_classification) + '.hdr'))
+  nl = FIX(read_info('lines', in_dir + '\' + remove_ext_from_fn(fn_classification) + '.hdr'))
+  dt_class = FIX(read_info('data type', in_dir + '\' + remove_ext_from_fn(fn_classification) + '.hdr'))
+  
+  ns_mask = FIX(read_info('samples', in_dir + '\' + remove_ext_from_fn(fn_project_mask) + '.hdr'))
+  nl_mask = FIX(read_info('lines', in_dir + '\' + remove_ext_from_fn(fn_project_mask) + '.hdr'))
+  dt_mask = FIX(read_info('data type', in_dir + '\' + remove_ext_from_fn(fn_project_mask) + '.hdr'))
+  
+  IF (ns NE ns_mask) OR (nl NE nl_mask) OR (ns NE ns_LSb) OR (nl NE nl_LSb) $
+                     OR (ns NE ns_LSa) OR (nl NE nl_LSa) THEN STOP
+  ;here I get the classification results
+  classif = MAKE_ARRAY(ns, nl, TYPE = dt_class)
+  OPENR, lun, in_dir + '\' + fn_classification, /GET_LUN
+  READU, lun, classif
+  FREE_LUN, lun
+  ;reset slc class to 200
+  ind_slc = WHERE(classif EQ slc_class, count_slc)
+  IF (count_slc GT 0) THEN  classif[ind_slc] = 200
+  PRINT, 'Slc class with value was reset to value 200 because 0 cannot be treated in serach algorithm'
+  slc_class = 200
+  
+  ;retrieve project size and misture
+  ;here I assume I get the raster mask for the project (id where project 0 otherwise),
+  ;id can be any integer and indicates the prject number
+  mask = MAKE_ARRAY(ns, nl, TYPE = dt_mask)
+  OPENR, lun, in_dir + '\' + fn_project_mask, /GET_LUN
+  READU, lun, mask
+  FREE_LUN, lun
+  
+  ;Define the dimension of the window used to serach for an appropriate control
+  ;find out how big is my project (innumber of pixels)
+  ind_trgt_project = WHERE(mask EQ target_id, npix_trgt_project)
+  PRINT, 'Project id ' + STRTRIM(target_id,2) + ' has ' + STRTRIM(npix_trgt_project,2) + ' pixels' 
+  winsize = FLOOR(SQRT(npix_trgt_project))
+  IF (winsize MOD 2 EQ 0) THEN BEGIN
+    PRINT, 'An even window size of ' + STRTRIM(winsize,2) + ' cannot be used, I will use'
+    winsize = winsize + 1
+    PRINT,  STRTRIM(winsize,2) + ' instead'
+  ENDIF
+  PRINT, 'A square window of ' + STRTRIM(winsize,2) + ' by ' + STRTRIM(winsize,2) + ' will be used'
+  
+  ;Make some calculatio to allow computing the distance between any serached window and the project of interest
+  ;here compute the centroid of the project in matrix coordinates
+  posCR = ARRAY_INDICES(mask, ind_trgt_project)
+  C_centroid = ROUND(MEAN(FLOAT(posCR[0,*])))
+  R_centroid = ROUND(MEAN(FLOAT(posCR[1,*])))
+  Cmat = mask*0
+  Rmat = Cmat
+  FOR c=0, nl-1 DO Cmat[*,c] = INDGEN(ns)
+  FOR c=0, ns-1 DO Rmat[c,*] = INDGEN(nl)
+  ;apply Pitagora
+  eucl_dist = SQRT((Cmat-C_centroid)^2+(Rmat-R_centroid)^2)
+  ;Save the distance to the project file
+  fn_dist = 'dist_project_' + STRTRIM(target_id,2)
+  OPENW, lun, out_dir + '\' + fn_dist + '.img', /GET_LUN
+  WRITEU, lun, eucl_dist
+  FREE_LUN, lun
+  map_info = read_info('map info', in_dir + '\' + remove_ext_from_fn(fn_classification) + '.hdr')
+  coord_info = read_info('coordinate system string', in_dir + '\' + remove_ext_from_fn(fn_classification) + '.hdr')
+  dt = SIZE(eucl_dist)
+  dt = dt[-2]
+  OPENW, lun, out_dir + '\' + fn_dist + '.hdr', /GET_LUN
+  PRINTF, lun, 'ENVI'
+  PRINTF, lun, 'samples = ' + STRTRIM(ns,2)
+  PRINTF, lun, 'lines = ' + STRTRIM(nl,2)
+  PRINTF, lun, 'bands = 1'
+  PRINTF, lun, 'data type  = ' + STRTRIM(dt,2)
+  PRINTF, lun, 'file type = ENVI Standard'
+  PRINTF, lun, 'interleave = bsq'
+  PRINTF, lun, 'byte order = 0'
+  PRINTF, lun, 'map info = ' + map_info
+  PRINTF, lun, 'coordinate system string = ' +coord_info
+  FREE_LUN, lun
+  
+  ;Check what is assigned to SLC using classification of LS7
+  possible_values = classif[UNIQ(classif, SORT(classif))]
+  PRINT, 'Classification possible values:'
+  PRINT, possible_values
+  IF slc_present THEN BEGIN
+    PRINT, 'These are for SLC:'
+    PRINT, slc_class
+    IF N_ELEMENTS(slc_class) GT 1 THEN STOP ;not delaing with mor ethan one value anymore
+    PRINT, 'And will be all reclassified to the first value (' + STRTRIM(slc_class[0],2) + ')' 
+    unique_scl_class = slc_class[0]
+    FOR i = 0, N_ELEMENTS(slc_class) - 1 DO BEGIN
+      ind = WHERE(classif EQ slc_class[i])
+      classif[ind] = slc_class[0]
+    ENDFOR
+    possible_values = classif[UNIQ(classif, SORT(classif))]
+    PRINT, 'Now the classification possible values are:'
+    PRINT, possible_values
+  ENDIF
+  npv = N_ELEMENTS(possible_values)
+  
+  ;Count the occurrences (number) of various classes within each window
+  ;results are stored in countMat, that has the same x and y dim of input image and for eah band,
+  ;the count of possible_values[i] stored in the central pixel
+  s = Size(classif, /DIMENSIONS)
+  countMat = FLTARR(s[0], s[1], npv)
+  FOR i = 0, npv-1 DO BEGIN
+    valueToSearch = possible_values[i]
+    kernel = Replicate(1.0/valueToSearch, winsize, winsize) 
+    countMat[*,*,i] = Small_Region_Values(classif, valueToSearch, KERNEL=kernel)
+  ENDFOR
+  
+  ;compute the fractional composition of the project (n_pix in the various classification values)
+  fract_comp = FLTARR(npv)  ;fraction having that value
+  FOR i = 0, npv-1 DO BEGIN
+    ind_tmp = WHERE(classif[ind_trgt_project] EQ possible_values[i], count_tmp)
+    fract_comp[i] = count_tmp / FLOAT(npix_trgt_project)
+  ENDFOR
+  PRINT, 'Project composition'
+  PRINT, fract_comp
+  
+  ;compute fractional composition of each of the candidate windows (based on countMat)
+  fract_countMat = countMat / FLOAT(winsize^2)
+  
+  ;Compute the rmse between the fractional compostion of any of the canidate windows and the project composition
+  ;make the rmse half on slc and half on class composition
+  PRINT, 'RMSE made up by 0.5 RMSE class compostion, 0.5 fraction of slc 
+  rmse = FLTARR(s[0], s[1])
+  FOR i = 0, s[0]-1 DO BEGIN ;columns
+    FOR j = 0, s[1]-1 DO BEGIN ;raws
+      first = SQRT(TOTAL((fract_countMat[i,j,0:-2] - fract_comp[0:-2])^2)/FLOAT(npv-1))
+      second = SQRT((fract_countMat[i,j,-1] - fract_comp[-1])^2)
+      rmse[i,j] = (first + second)/2.0
+    ENDFOR
+  ENDFOR
+  ;PRINT, 'RMSE with project composition'
+  ;PRINT, rmse, FORMAT='(10F6.3)'
+  ;
+  ;Exclude from being selected those window having border effect and all those touching a project (the reference itself or any other= 
+  ;exclude borders by loking at those celles that have all valida values (winsize*winsize values)
+  n_validMat = TOTAL(countMat,3)
+  ;PRINT, 'N valid'
+  ;PRINT, n_validMat, FORMAT='(10I3)'
+  ;set those having less than winsize*winsize values to 9 (as max of rmse is 1)
+  tmp_ind = WHERE(n_validMat LT winsize^2, tmp_count)
+  rmse[tmp_ind] = 9.0
+  
+  ;exclude the project itself and those area belonging to other project
+  tmp_ind = WHERE(mask NE 0, tmp_count)
+  ;augment these excluded so that any moving window touching these area are excluded
+  exclude = mask * 0
+  exclude[tmp_ind] = 1
+  kernel = Replicate(1.0, winsize, winsize) 
+  exclude2 = CONVOL(exclude, kernel, /EDGE_ZERO)
+  tmp_ind = WHERE(exclude2 GT 0)
+  rmse[tmp_ind] = 9.0
+  
+  ;select absolute best window (be care this can be very far from the project)
+  val_best = MIN(rmse, pos_best)
+  mask_control = mask * 0
+  posCR = ARRAY_INDICES(mask_control, pos_best)
+  PRINT, 'position, fractional composition of the most similar, and rmse'
+  PRINT, posCR
+  PRINT, REFORM(fract_countMat[posCR[0],posCR[1],*])
+  PRINT, REFORM(rmse[posCR[0],posCR[1]])
+  ;assign the value of 1 to this window (abs best)
+  mask_control[posCR[0]-(winsize-1)/2:posCR[0]+(winsize-1)/2, posCR[1]-(winsize-1)/2:posCR[1]+(winsize-1)/2] = 1
+  DELVAR, cmat, countmat, doy_dist, exclude, exclude2, n_validmat, rmat, tmp_ind
+  SAVE, /ALL, FILENAME = 'S:\Actions\FOODSEC\projects\GGW_monitoring\LUISA\IDL_outputs\debug.sav'
+ENDIF ELSE BEGIN
+  RESTORE,  'S:\Actions\FOODSEC\projects\GGW_monitoring\LUISA\IDL_outputs\debug.sav'
+ENDELSE
+;now select the best 1 % and then take the k closest and non overlapping of them
+ind = WHERE(rmse LT max_rmse_dif, n_candidates)
+PRINT, 'N of candidates = ' + STRTRIM(n_candidates,2)
+;dist_of_ind =  eucl_dist[ind]
+n_selected = 0
+n_tested = 0
+REPEAT BEGIN
+  IF (n_tested GE n_candidates) THEN BEGIN
+    PRINT, 'Only ' + STRTRIM(n_selected, 2) + ' non overlapping controls were selected'
+    PRINT, 'instead of ' + STRTRIM(k, 2) + ' requested, the program will stop' 
+    STOP
+  ENDIF
+  n_tested = n_tested + 1
+  dist_of_ind =  eucl_dist[ind]
+  minval = MIN(dist_of_ind, min_sub, /NAN)
+  pos_best_compromise = ind[min_sub]
+  ;a candidate control is selected, make sure that it's not selected anymore by setting is distance to + inf
+  eucl_dist[pos_best_compromise] = !VALUES.F_INFINITY
+  posCRc = ARRAY_INDICES(mask_control, pos_best_compromise)
+  ;check that this selection does not overlap with a previous one
+  checksum = TOTAL(mask_control[posCRc[0]-(winsize-1)/2:posCRc[0]+(winsize-1)/2, posCRc[1]-(winsize-1)/2:posCRc[1]+(winsize-1)/2])
+  ;checksum is 0 non of the pixels in the window were already assigne to a control
+  IF (checksum EQ 0) THEN BEGIN
+    n_selected = n_selected + 1
+    PRINT, 'position, fractional composition of the closest with max ' + STRTRIM(max_rmse_dif,2) + ' rmse, and rmse, for control ' + STRTRIM(n_selected,2) 
+    PRINT, posCRc
+    PRINT, REFORM(fract_countMat[posCRc[0],posCRc[1],*])
+    PRINT, REFORM(rmse[posCRc[0],posCRc[1]])
+    ;assign the value of 10 + i to this i window (closest with max 1% diff)
+    mask_control[posCRc[0]-(winsize-1)/2:posCRc[0]+(winsize-1)/2, posCRc[1]-(winsize-1)/2:posCRc[1]+(winsize-1)/2] = 10 + n_selected
+  ENDIF 
+ENDREP UNTIL (n_selected EQ k)
+
+
+fn_control_mask = 'control_mask_project_' + STRTRIM(target_id,2)
+OPENW, lun, out_dir + '\' + fn_control_mask + '.img', /GET_LUN
+WRITEU, lun, mask_control
+FREE_LUN, lun
+map_info = read_info('map info', in_dir + '\' + remove_ext_from_fn(fn_classification) + '.hdr')
+coord_info = read_info('coordinate system string', in_dir + '\' + remove_ext_from_fn(fn_classification) + '.hdr')
+dt = SIZE(mask_control)
+dt = dt[-2]
+OPENW, lun, out_dir + '\' + fn_control_mask + '.hdr', /GET_LUN
+PRINTF, lun, 'ENVI'
+PRINTF, lun, 'samples = ' + STRTRIM(ns,2)
+PRINTF, lun, 'lines = ' + STRTRIM(nl,2)
+PRINTF, lun, 'bands = 1'
+PRINTF, lun, 'data type  = ' + STRTRIM(dt,2)
+PRINTF, lun, 'file type = ENVI Standard'
+PRINTF, lun, 'interleave = bsq'
+PRINTF, lun, 'byte order = 0'
+PRINTF, lun, 'map info = ' + map_info
+PRINTF, lun, 'coordinate system string = ' +coord_info
+FREE_LUN, lun
+
+;save  RMSE matrix
+ind = WHERE(rmse EQ 9.0) 
+rmse[ind] = !VALUES.F_NAN
+fn_rmse = 'rmse_project_' + STRTRIM(target_id,2)
+OPENW, lun, out_dir + '\' + fn_rmse + '.img', /GET_LUN
+WRITEU, lun, rmse
+FREE_LUN, lun
+map_info = read_info('map info', in_dir + '\' + remove_ext_from_fn(fn_classification) + '.hdr')
+coord_info = read_info('coordinate system string', in_dir + '\' + remove_ext_from_fn(fn_classification) + '.hdr')
+dt = SIZE(rmse)
+dt = dt[-2]
+OPENW, lun, out_dir + '\' + fn_rmse + '.hdr', /GET_LUN
+PRINTF, lun, 'ENVI'
+PRINTF, lun, 'samples = ' + STRTRIM(ns,2)
+PRINTF, lun, 'lines = ' + STRTRIM(nl,2)
+PRINTF, lun, 'bands = 1'
+PRINTF, lun, 'data type  = ' + STRTRIM(dt,2)
+PRINTF, lun, 'file type = ENVI Standard'
+PRINTF, lun, 'interleave = bsq'
+PRINTF, lun, 'byte order = 0'
+PRINTF, lun, 'map info = ' + map_info
+PRINTF, lun, 'coordinate system string = ' +coord_info
+FREE_LUN, lun
+
+
+
+;Save, for the project and the control selected window (closest with max 10%), a csv file with LS NDVI
+;note that SLC pixels are not saved for LS7 (before) and LS8 (after)
+;write also the same in Anne's R format
+dlmtr = ','
+OPENW, lunAnne, out_dir + '\ndvi_control_and_project' + STRTRIM(target_id,2)+'_ANNE_FORMAT.csv', /GET_LUN
+PRINTF, lunAnne, 'SiteClass'+dlmtr+'Site'+dlmtr+'Period'+dlmtr+'Pixel'+dlmtr+'NDVI'
+
+ind = WHERE((mask EQ target_id) AND (classif NE unique_scl_class))
+ndvi_project_before = REFORM(ndvi_before[ind])
+ndvi_project_after = REFORM(ndvi_after[ind])
+
+;Anne's format
+FOR i = 0, N_ELEMENTS(ndvi_project_before)-1 DO BEGIN
+ PRINTF, lunAnne, 'Impact'+dlmtr+'I'+STRTRIM(target_id,2)+dlmtr+'before'+dlmtr+'P'+STRTRIM(i+1,2)+dlmtr+ndvi_project_before[i]
+ENDFOR
+FOR i = 0, N_ELEMENTS(ndvi_project_after)-1 DO BEGIN
+  PRINTF, lunAnne, 'Impact'+dlmtr+'I'+STRTRIM(target_id,2)+dlmtr+'after'+dlmtr+'P'+STRTRIM(i+1,2)+dlmtr+ndvi_project_after[i]
+ENDFOR
+
+tmp = FLTARR(2+k*2, N_ELEMENTS(ndvi_project_before)*2)* !VALUES.F_NAN
+tmp[0,0:N_ELEMENTS(ndvi_project_before)-1] = ndvi_project_before
+tmp[1,0:N_ELEMENTS(ndvi_project_after)-1] = ndvi_project_after
+hdr = ['Project_before', 'Project_after']
+FOR i = 1, k DO BEGIN
+  ind = WHERE((mask_control EQ 10+i) AND (classif NE unique_scl_class))
+  ndvi_control_before = REFORM(ndvi_before[ind])
+  ndvi_control_after =  REFORM(ndvi_after[ind])
+  
+  ;Anne's format
+  FOR j = 0, N_ELEMENTS(ndvi_control_before)-1 DO BEGIN
+    PRINTF, lunAnne, 'Control'+dlmtr+'C'+STRTRIM(target_id,2)+'_'+STRTRIM(i,2)+dlmtr+'before'+dlmtr+'P'+STRTRIM(j+1,2)+dlmtr+ndvi_control_before[j]
+  ENDFOR
+  FOR j = 0, N_ELEMENTS(ndvi_control_after)-1 DO BEGIN
+    PRINTF, lunAnne, 'Control'+dlmtr+'C'+STRTRIM(target_id,2)+'_'+STRTRIM(i,2)+dlmtr+'after'+dlmtr+'P'+STRTRIM(j+1,2)+dlmtr+ndvi_control_after[j]
+  ENDFOR
+  
+  tmp[i*2,0:N_ELEMENTS(ndvi_control_before)-1] = ndvi_control_before
+  tmp[i*2+1,0:N_ELEMENTS(ndvi_control_after)-1] = ndvi_control_after
+  hdr = [hdr,  'Control_' + STRTRIM(i,2) + '_Before', 'Control_' + STRTRIM(i,2) + '_After']
+ENDFOR
+
+FREE_LUN, lunAnne 
+WRITE_CSV, out_dir + '\ndvi_control_and_project' + STRTRIM(target_id,2)+'.csv', $
+           HEADER=hdr, $
+           tmp
+
+
+
+
+
+avgs = MEAN(tmp, DIMENSION= 2, /NAN)
+PRINT, 'Averages. Before, After; Project and then controls'
+PRINT, avgs
+PRINT, 'Project delta = ' + STRTRIM(avgs[1]-avgs[0])
+FOR i = 1, k DO PRINT, 'Control ' + STRTRIM(i,2) + ' delta = ' + STRTRIM(avgs[i*2+1]-avgs[i*2])
+END
+

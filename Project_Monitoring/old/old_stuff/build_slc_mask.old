@@ -1,0 +1,67 @@
+PRO build_slc_mask
+
+
+  ;USER PART
+  dir = 'S:\Actions\FOODSEC\projects\GGW_monitoring\GGW_Landsat_analysis\GGW_Senegal_East\GEE_download'
+  fn =  'LE72040492007259EDC00_E.tif'
+  isENVI = 0 ;1 if it is ENVI format, 0 if is tif, ENVI was omitted 05 03 2016
+  ;** END OF USER PARYT
+
+  IF isENVI THEN BEGIN
+;    ns = read_info('samples', dir + '\' + fn + '.hdr')
+;    nl = read_info('lines', dir + '\' + fn + '.hdr')
+;    nb = read_info('bands', dir + '\' + fn + '.hdr')
+;    data = BYTARR(ns, nl, nb)
+;    OPENR, lun, dir + '\' + fn, /GET_LUN
+;    READU, lun, data
+;    FREE_LUN, lun
+;    mult = PRODUCT(FLOAT(data), 3)
+    STOP
+  ENDIF ELSE BEGIN
+    ;implement reading TIF
+    data = READ_TIFF(dir + '\' +fn)
+    res = QUERY_TIFF(dir + '\' +fn, GEOTIFF = geoinfo)
+    sz = SIZE(data) & ns = sz[2] & nl = sz[3]
+    ;remove non refletive bands
+    data_ref = BYTARR(6, ns, nl)
+    FOR i = 0,4 DO data_ref[i,*,*] = data[i,*,*]
+    ;deprecated: data_ref[5,*,*] = data[6,*,*]
+    data_ref[5,*,*] = data[7,*,*]
+    fn = FILE_BASENAME(fn, '.tif')
+    mult = PRODUCT(FLOAT(data_ref), 1)
+  ENDELSE
+  mask = BYTARR(ns, nl) * 0B
+
+  ind = WHERE(mult GT 0, count)
+  mask[ind] = 1B
+
+  fn = dir + '\' + fn + '_mask_SLC_bands_1-5and8'
+  WRITE_TIFF, fn + '.tif', mask, /FLOAT, GEOTIFF = geoinfo
+  e = ENVI(/HEADLESS)
+  raster1 = e.OpenRaster(fn + '.tif')
+  res = FILE_SEARCH(fn + '.img')
+  IF (res NE '') THEN FILE_DELETE, res
+  raster1.Export, fn + '.img', 'envi'
+  CLOSE, /ALL
+
+  ;;write the mask
+  ;OPENW, lun, dir + '\' + fn + '_mask_SLC', /GET_LUN
+  ;WRITEU, lun, mask
+  ;FREE_LUN, lun
+  ;;writrhe the hdr
+  ;OPENW, lun, dir + '\' + fn + '_mask_SLC.hdr', /GET_LUN
+  ;
+  ;PRINTF, lun, 'ENVI
+  ;PRINTF, lun, 'description = {IDL created madsk}
+  ;PRINTF, lun, 'samples = ' + STRTRIM(ns,2)
+  ;PRINTF, lun, 'lines   = ' + STRTRIM(nl,2)
+  ;PRINTF, lun, 'bands   = 1'
+  ;PRINTF, lun, 'header offset = 0'
+  ;PRINTF, lun, 'data type = 1'
+  ;PRINTF, lun, 'interleave = bsq'
+  ;PRINTF, lun, 'byte order = 0'
+  ;PRINTF, lun, 'default stretch = 0.000000 1.000000 linear'
+  ;PRINTF, lun, 'band names = {'
+  ;PRINTF, lun, 'Mask Band}'
+  ;FREE_LUN, lun
+END

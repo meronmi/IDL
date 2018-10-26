@@ -1,0 +1,13 @@
+Pro main
+  path='X:\Niger\old\giancarlo\Optim_lag_ndvi'
+  filename='NDVIC00-09CropMask+yields2.csv'
+  data = RDCSV(path+'\'+filename, ',')
+  ;{reg:reg, year:year, yield:yield, nd:nd[ND_dekads,regiona and year}
+  yield_regress, data, path, 0
+  ;without base line
+  n_records=N_ELEMENTS(data.nd[0,*])
+  for i=0, n_records-1 do begin
+    data.nd[*,i]=data.nd[*,i]-MEAN(data.nd[0:5,i], /DOUBLE)
+  endfor
+  yield_regress, data, path, 10
+End

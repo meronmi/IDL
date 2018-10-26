@@ -1,0 +1,25 @@
+path = E:\ILRI\pheno
+
+
+faprangeminthresh = 0.1			;expected minimum variability value moved to info file
+use_lomb = 1          			;use_lomb 
+lombRatThreshold = 6.0  		;Above this ratio of peak1/peak2 we assume ngspy = 1, below it's ngspy = 2
+upenv = 1				;0 = Normal model fit, 1 = Upper envelope fit
+period = 10             ;for decadal analysis, the only possible now
+
+ibel = 0.0  		;ignore below
+iabo = 1.0		;ignore above
+fract_thresh = 0.20   	;fraction of amplitued use to compute start and stop in pdhtf (see White et al., 2009)
+fract_thresh2 = 0.99  	;fraction of amplitued use to compute the second stop in pdhtf
+
+filein = eMODIS_ndvi_01_13_sc
+acqJULDAY = eMODIS_JD_01_13	;must be a long integer bil
+mask = no_mask
+ns = 3350
+nl = 4124
+nb = 468
+fst_dek = 1                    
+fst_day = 1
+fst_month = 1
+first_year = 2001      
+last_year = 2013        

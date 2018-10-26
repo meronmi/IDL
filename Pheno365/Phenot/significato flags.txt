@@ -1,0 +1,21 @@
+DA METTERE NEL CODICE phenot_image
+gsflag codes
+-1	: too few obs (cuurently LE 7)
+0 	: optization failed 
+10	: optimization success
+
+
+gsstat codes
+-100	: too few obs (cuurently LE 7)
+0-4	: mpfit success
+5	: mpfit failure
+gt 5	: mpfit success
+
+gsrel
+0	:ok
++10	: 2/3 or more of the missing values are within the first half of the period of interest 
++20	: 2/3 or more of the missing values are within the second half of the period of interest 
++100	: the following conditions are not met
+	  - first and last good values LE median of entire distrubution
+	  - there is a local maximum above that value
++1000	: the algorithm was trying to extend the search period beyond the limits of fapar array

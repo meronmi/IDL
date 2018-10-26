@@ -1,0 +1,17 @@
+doavg = 0
+frstDOYofCycle = 280
+boi=14		;index starting from 1 now!!!!!!!!!!!!!!
+aoper = dlt
+fnames =  A28eos-1997_eos
+transformJD2DOC = 1
+val999 = NaN
+basePath= Q:\HoA\VGT data\raw\bil\DIR_RECOMPOSED_UppEnv_2012_01_01
+realigned_dir = REALIGN_ON_eos
+fname_rel = A28eos-1997_comp
+rel_threshold = 95.0       
+fname_globstat = globstat
+dep_fname=''
+ns=3586
+nl=3810
+nb=16
+data_type=4

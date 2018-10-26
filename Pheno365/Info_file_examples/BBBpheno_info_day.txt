@@ -1,0 +1,13 @@
+path = Q:\fromDek2DayDebug	; boh
+faprangeminthresh = 0.05 
+filein = bil_IGAD_VGT_20120401_a_sc
+acqJULDAY = bil__IGAD_VGT_20120401_acqJULDAY	;must be a long integer bil
+mask = HoA_mask
+ns = 3586
+nl = 3810
+nb = 505
+fst_dek = 10                    
+fst_day = 1
+fst_month = 4
+first_year = 1998      
+last_year = 2011        

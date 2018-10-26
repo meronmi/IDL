@@ -1,0 +1,311 @@
+PRO simForwMod_handler
+;Set the parameter of the model and run the model in forward mode
+
+;FIXED PARAMETERS
+globrad2par=0.48    ;conversion factor from Global radiation to PAR
+tb = 0              ;base temperature to comput degree days (dDD = MAX(Tair-Tb, 0)
+
+
+;SET THE TEMPORAL DOMAIN
+; start year and DOY (a period larger than any possible start and end of season)
+sYear = 2007 & sDOY = 120 ;100
+; end year and DOY
+eYear = 2008 & eDOY = 60; 110 
+
+;FREE parameter during current season simulation
+DOY0 = 175           ;DOY at which the LAI is laiDOY0, it is used to approximate emergence of the crop
+
+
+;PROSAIL PARAMETERS (Sailh parametrization as in Guo et al, 2014, IJRS
+proSailVar = { $
+  Cab    : 29.0d    ,$; chlorophyll content (µg.cm-2) (0-100 ug cm-2) for grassland (Atzberger et al., Suitability and 
+                        ;adaptation of PROSAIL radiative transfer model for  hyperspectral grassland studies, 
+                        ;RS Letters, Vol. 4, No. 1, January 2013, 55–64, DOI: 10.1080/2150704x.2012.689115 
+  Car    : 0.0d     ,$; 12.0d    ;; carotenoid content (µg.cm-2)  (0-25 ug cm-2)
+  Cbrown : 0.0d     ,$;0.5d     ;; brown pigment content (0-1 arbitrary units)
+  Cw     : 0.01     ,$;0.015d   ;; EWT (cm) - Equivalent water thickness (0-0.05 cm)
+  Cm     : 0.004d   ,$;0.1d     ;; LMA (g cm-2) - leaf mass per unit leaf area (0-0.02 g cm-2), the smaller, the bigger SLA (m2 g-1)
+  Ns     : 1.5d     ,$;; structure coefficient (1-3 dimensionless)
+  lidf_a : -0.35    ,$
+  lidf_b : -0.15    ,$
+  lai    : 0.0d    ,$;; leaf area index
+  hspot  : 0.05d    ,$; hot spot for grass (Atzberger et al., as above)
+  tts    : 30.0d    ,$;; solar zenith angle (°)
+  tto    : 0.0d     ,$;; observer zenith angle (°)
+  psi    : 0.0d     ,$;; relative azimuth (°)
+  rsoil  : FLTARR(2101)}     ; soil coefficient
+
+
+;POTENTIALLY FIXED or tuned on a longer time series (for example 5 years)
+;for the SLA we have to inscyer consistency with PROSAIL simulation
+SLA = 1.0d/(proSailVar.Cm*100*100)            ; 0.02, Specific Leaf Area(m2 g-1)
+gamma=0.0           ;respiration coefficient (1/10), re=gamma*GPP
+;k_lb = 0.54         ;coefficient of Lambert-Beer fapar=1-exp(-k_lai*lai)
+laiDOY0 = 0.05;0.05      ;LAI value at DOY0, emergence
+eps_max=2.25        ;(kgDM/GJ_PAR = gDM MJ-1) source: 2.54 from MARSOP3-LOTII interim report; 2.23 gC / MJ according to Sjstrom 2009 and using a convertion 1 mol PAR = (1/4.56) MJ PAR (from wiki)
+;the following have to be modelled
+c = 1500           ;J = c + d * GDD, as in Maas, 1993)
+                    ;parameters controlling the leaf lifespan in DegDays, c acts as a base life span
+d = 1.0            ; 0 d controls the lifespan (j) a function of the degree days at emergence, e.g.
+                    ;if d if GT 0 it makes the leaves emerging later to live longer
+a = 0.02            ;(P1 = Max(1-a*EXP(b*GDD), 0) as in Maas, 1993)
+b = 0.0023           ;0.002coefficients a and b for partitioning into leaves (as in Maas, 1993), spring wheat
+
+
+  
+  
+;LOAD THE REQUIRED VARIABLES
+;Modis    
+;to generate this csv, use R script in d:\Users\meronmi\Documents\R_scripts\MODIS-FORGE to download the data 
+;and then run readMODISprofile.pro IDL function to geneate the csv
+modis_fn = 'd:\Users\meronmi\Documents\R_scripts\MODIS-FORGE\1x1SudanEddy\Lat13.2829Lon30.4783Samp1Line1.csv'
+tmp =  READ_CSV2(modis_fn, HEADER=hdr, MISSING_VALUE=-9999)
+;replace -9999 with NaN
+FOR i=0, N_TAGS(tmp)-1 DO BEGIN
+  ind = WHERE(tmp.(i) EQ -9999, count)
+  IF (count GT 0) THEN tmp.(i)[ind] = !VALUES.D_NAN
+ENDFOR
+modis_data = rename_tags(tmp, $
+  ['FIELD01','FIELD02','FIELD03','FIELD04','FIELD05','FIELD06','FIELD07','FIELD08','FIELD09','FIELD10','FIELD11','FIELD12','FIELD13','FIELD14','FIELD15'], $
+  ['Year','DOY_comp','YearDayfract','Year_acq','DOY_acq','RAA','SZA','VZA','R1','R2','R3','R4','R5','R6','R7'])  
+modis_data = CREATE_STRUCT(modis_data, 'JD', FLTARR(N_ELEMENTS(modis_data.DOY_acq)))
+modis_data.JD = DOY_YEAR2JD(modis_data.DOY_acq, modis_data.Year_acq)
+
+
+
+;Choose rsoil to use
+;OPTION 1 (as coded in original PROSAIL5B)
+;psoil  = 1.0d     ;; soil coefficient
+;data=dataSpec_P5B() ;;
+;Rsoil1=data(9,*);;
+;Rsoil2=data(10,*);;
+;proSailVar.rsoil=psoil*Rsoil1+(1.0-psoil)*Rsoil2;;
+;OPTION 2, Retrieve Rsoil at 1 nm resolution 
+proSailVar.rsoil = rback_from_MODIS_TS(modis_data.R1,modis_data.R2,modis_data.R3,modis_data.R4,modis_data.R5,modis_data.R6,modis_data.R7)
+ 
+;ECMWF
+;(see d:\Users\meronmi\Documents\DB connection\query for ecmwf.txt for generating ecmwf csv files from db)
+ecmwf_fn = 'd:\Users\meronmi\Documents\DB connection\ECMWF_Sudan_13_25-30.5_daily.csv'
+tmp =  READ_CSV2(ecmwf_fn, HEADER=hdr, MISSING_VALUE=-9999)
+;here we only use few variables ('acqdate', 'tav', 'rrr','rad')
+n = N_ELEMENTS(tmp.FIELD01)
+ecmwf_data = {year: INTARR(n), $
+              month: INTARR(n), $
+              day:  INTARR(n), $
+              JD: FLTARR(n), $
+              tav: FLTARR(n), $
+              rad: FLTARR(n), $
+              rain: FLTARR(n)}
+ind = WHERE(hdr EQ 'acqdate')
+dates = STRSPLIT(tmp.(ind), '-', /EXTRACT)
+dates = dates.ToArray(/TRANSPOSE)
+ecmwf_data.month = dates[1,*]
+ecmwf_data.day = dates[0,*]
+ind = WHERE(hdr EQ 'year') & ecmwf_data.year = tmp.(ind)
+ecmwf_data.JD = JULDAY(ecmwf_data.month, ecmwf_data.day, ecmwf_data.year)
+ind = WHERE(hdr EQ 'rad') & ecmwf_data.rad = tmp.(ind)/1000.0 ;ecmwf rad is KJ/m2 and it's needed in MJ/m2 
+ind = WHERE(hdr EQ 'tav') & ecmwf_data.tav= tmp.(ind)
+ind = WHERE(hdr EQ 'rrr') & ecmwf_data.rain = tmp.(ind)
+
+;EDDY
+eddy_fn = 'S:\Actions\FOODSEC\projects\Biomass Sahel\eddyData\1869784026\site186_CEIP_EC_L4_SD-Dem_2007-2009.csv'
+tmp =  READ_CSV2(eddy_fn, HEADER=hdr, MISSING_VALUE=-9999)
+n = N_ELEMENTS(tmp.FIELD01)
+eddy_data = { year: INTARR(n), $
+              month: INTARR(n), $
+              day:  INTARR(n), $
+              JD: FLTARR(n), $
+              radg: FLTARR(n), $
+              ta: FLTARR(n), $
+              vpd: FLTARR(n), $
+              precip: FLTARR(n), $
+              swc: FLTARR(n), $
+              nee_mds: FLTARR(n), $
+              nee_ann: FLTARR(n), $
+              gpp_mds: FLTARR(n), $
+              gpp_ann: FLTARR(n)}
+
+ind = WHERE(hdr EQ 'Year')        & eddy_data.year = FLOAT(tmp.(ind))
+ind = WHERE(hdr EQ 'Month')       & eddy_data.month = FLOAT(tmp.(ind))
+ind = WHERE(hdr EQ 'Day')         & eddy_data.day = FLOAT(tmp.(ind))
+ind = WHERE(hdr EQ 'Rg_f')        & eddy_data.radg = FLOAT(tmp.(ind))
+ind = WHERE(hdr EQ 'Ta_f')        & eddy_data.ta = FLOAT(tmp.(ind))
+ind = WHERE(hdr EQ 'VPD_f')       & eddy_data.vpd = FLOAT(tmp.(ind))
+ind = WHERE(hdr EQ 'Precip')      & eddy_data.precip = FLOAT(tmp.(ind))
+ind = WHERE(hdr EQ 'SWC')         & eddy_data.swc = FLOAT(tmp.(ind))
+ind = WHERE(hdr EQ 'NEE_st_fMDS') & eddy_data.nee_mds = FLOAT(tmp.(ind))
+ind = WHERE(hdr EQ 'NEE_st_fANN') & eddy_data.nee_ann = FLOAT(tmp.(ind))
+ind = WHERE(hdr EQ 'GPP_st_MDS')  & eddy_data.gpp_mds = FLOAT(tmp.(ind))
+ind = WHERE(hdr EQ 'GPP_st_ANN')  & eddy_data.gpp_ann = FLOAT(tmp.(ind))
+eddy_data.JD = JULDAY(eddy_data.month, eddy_data.day, eddy_data.year)
+;replace -9999 with NaN
+FOR i=0,N_TAGS(eddy_data)-1 DO BEGIN
+  ind = WHERE(eddy_data.(i) EQ -9999, count)
+  IF (count GT 0) THEN eddy_data.(i)[ind] = !VALUES.D_NAN
+ENDFOR
+
+;*******************************************************************
+;Temporal domain settings 
+;(tranform dates into JD and extract relevant data to be sent to forward model)
+;ECMWF
+sJD = DOY_YEAR2JD(sDOY, sYear)
+eJD = DOY_YEAR2JD(eDOY, eYear)
+JD0 = DOY_YEAR2JD(DOY0, sYear)
+sind_ecmwf = WHERE(ecmwf_data.JD EQ sJD)
+eind_ecmwf = WHERE(ecmwf_data.JD EQ eJD)
+tJD = ecmwf_data.JD[sind_ecmwf:eind_ecmwf]
+globrad = ecmwf_data.rad[sind_ecmwf:eind_ecmwf]
+tair = ecmwf_data.tav[sind_ecmwf:eind_ecmwf]
+;MODIS
+indFin = WHERE(FINITE(modis_data.JD))
+sind_modis = WHERE(modis_data.JD[indFin] GE sJD)
+eind_modis = WHERE(modis_data.JD[indFin] LE eJD)
+sind_modis = indFin[sind_modis[0]]
+eind_modis = indFin[eind_modis[N_ELEMENTS(eind_modis)-1]]
+Red_obs = REFORM(modis_data.R1[sind_modis:eind_modis])
+Nir_obs = REFORM(modis_data.R2[sind_modis:eind_modis])
+;extract relevant JD and illumination-view geometry
+satObsJD = modis_data.JD[sind_modis:eind_modis]
+satObsRAA = ABS(modis_data.RAA[sind_modis:eind_modis])
+satObsSZA = modis_data.SZA[sind_modis:eind_modis]
+satObsVZA = modis_data.VZA[sind_modis:eind_modis]
+;Eddy data
+indFin = WHERE(FINITE(eddy_data.JD))
+sind_eddy = WHERE(eddy_data.JD[indFin] GE sJD)
+eind_eddy = WHERE(eddy_data.JD[indFin] LE eJD)
+sind_eddy = indFin[sind_eddy[0]]
+eind_eddy = indFin[eind_eddy[N_ELEMENTS(eind_eddy)-1]]
+indJD0_eddy = WHERE(eddy_data.JD[indFin] EQ JD0)
+indJD0_eddy = indFin[indJD0_eddy]
+;End of temporal domain settings
+;*******************************************************************
+
+;Processing of eddy data
+ta_eddy = eddy_data.Ta[indJD0_eddy:eind_eddy]
+gdd_eddy = ta_eddy * 0.0
+gdd_eddy[0] = MAX([ta_eddy[0]-Tb, 0.0])
+FOR i = 1, N_ELEMENTS(ta_eddy)- 1 DO  gdd_eddy[i] =  gdd_eddy[i-1]+ MAX([ta_eddy[i]-Tb, 0.0])
+
+
+
+;RUN FWD MODEL
+;sim = simForwModV1(JD0, laiDOY0, SLA, eps_max, gamma, c, d, a, b, tJD, globrad, globrad2par, tair, tb, proSailVar, satObsJD, satObsRAA, satObsSZA, satObsVZA)
+sim = simForwMod(JD0, laiDOY0, SLA, eps_max, gamma, c, d, a, b, tJD, globrad, globrad2par, tair, tb, proSailVar, satObsJD, satObsRAA, satObsSZA, satObsVZA)     
+;PLOTS
+;common settings
+dummy = LABEL_DATE(DATE_FORMAT=['%D/%N','%Y'])
+fs = 8 ;font size
+lp = [1.2, 1] ;legend position
+dm = [1000,1000]  ;dimensions of the window
+base_layout = [3,3]
+xrange = [MIN(tJD), MAX(tJD)]
+margin = [0.17,0.2,0.13,0.1]
+
+;Radiation, ECMWF
+gh_radg_ecmwf = PLOT (tJD, ecmwf_data.rad[sind_ecmwf:eind_ecmwf], YTITLE='GlobRad (MJ m-2)', XTITLE='Time', COLOR = 'black', XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', $
+  FONT_SIZE = fs, LAYOUT=[base_layout,1], DIMENSIONS=dm, MARGIN=margin, XRANGE=xrange, Name='ECMWF')
+;Radiation, Eddy flux data
+gh_radg_eddy = PLOT (eddy_data.JD[sind_eddy:eind_eddy], eddy_data.radg[sind_eddy:eind_eddy], COLOR = 'red', OVERPLOT = 1, Name='Eddy')
+!null = LEGEND(target=[gh_radg_ecmwf, gh_radg_eddy], /AUTO_TEXT_COLOR, FONT_SIZE = fs-2, POSITION=lp, /RELATIVE, $
+  SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.1, TRANSPARENCY=100)
+  
+;Precipitation, ECMWF
+gh_rain_ecmwf = PLOT (tJD, ecmwf_data.rain[sind_ecmwf:eind_ecmwf], YTITLE='Rain', XTITLE='Time', COLOR = 'black', XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', $
+  FONT_SIZE = fs, LAYOUT=[base_layout,2], DIMENSIONS=dm, MARGIN=margin, /CURRENT, XRANGE=xrange, Name='ECMWF')
+;Precipitation, Eddy flux data
+gh_rain_eddy = PLOT (eddy_data.JD[sind_eddy:eind_eddy], eddy_data.precip[sind_eddy:eind_eddy], COLOR = 'red', OVERPLOT = 1, Name='Eddy')
+!null = LEGEND(target=[gh_rain_ecmwf, gh_rain_eddy], /AUTO_TEXT_COLOR, FONT_SIZE = fs-2, POSITION=lp, /RELATIVE, $
+  SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.1, TRANSPARENCY=100)
+  
+;Temperature, ECMWF
+gh_gdd_ecmwf = PLOT (tJD, sim.gdd, YTITLE='GDD', XTITLE='Time', COLOR = 'black', XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', $
+  FONT_SIZE = fs, LAYOUT=[base_layout,3], DIMENSIONS=dm, MARGIN=margin, /CURRENT, XRANGE=xrange, Name='ECMWF')
+;Temperature, Eddy flux data
+gh_gdd_eddy = PLOT (eddy_data.JD[indJD0_eddy:eind_eddy], gdd_eddy, COLOR = 'red', OVERPLOT = 1, Name='Eddy')
+!null = LEGEND(target=[gh_gdd_ecmwf, gh_gdd_eddy], /AUTO_TEXT_COLOR, FONT_SIZE = fs-2, POSITION=lp, /RELATIVE, $
+  SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.1, TRANSPARENCY=100)
+
+;LAI/FAPAR
+gh_fa  = PLOT (tJD, sim.fa,  YTITLE='fAPAR', XTITLE='Time', COLOR = 'black', AXIS_STYLE = 1,$ 
+               XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', $
+               FONT_SIZE = fs, LAYOUT=[base_layout,4], MARGIN=margin, /CURRENT, $
+               NAME = 'FAPAR',YRANGE=[0.0,1.0], XRANGE=xrange)
+a_y = AXIS('x', TARGET = gh_fa, LOCATION = "top",GRIDSTYLE="none", MAJOR=0, MINOR=0)
+gh_lai  = PLOT (tJD, sim.lai,  COLOR = 'green', NAME = 'LAI', AXIS_STYLE = 0, $
+                XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', $
+                FONT_SIZE = fs, LAYOUT=[base_layout,4], MARGIN=margin, YRANGE = [0,6], XRANGE=xrange, /CURRENT)
+a_lai = AXIS('y', TARGET = gh_lai, LOCATION = [max(gh_lai.xrange),0,0], TICKFONT_SIZE = fs, TEXTPOS = 1, TITLE = 'LAI (m2 m-2)')
+
+!null = LEGEND(target=[gh_fa, gh_lai], /AUTO_TEXT_COLOR, FONT_SIZE = fs-2, POSITION=lp, /RELATIVE, $
+  SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.1, TRANSPARENCY=100)
+;dLAI
+gh_dlai = PLOT (tJD, sim.dlai, YTITLE='dLAI, LAI_senescent (m2 m-2)', XTITLE='Time', COLOR = 'green', XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', $
+  FONT_SIZE = fs, LAYOUT=[base_layout,5], MARGIN=margin, /CURRENT, NAME = 'newLAI', XRANGE=xrange)
+gh_senlai  = PLOT (tJD, sim.dlai_senescent,  COLOR = 'black', OVERPLOT=1, NAME = 'senLAI')
+!null = LEGEND(target=[gh_dlai, gh_senlai], /AUTO_TEXT_COLOR, FONT_SIZE = fs-2, POSITION=lp, /RELATIVE, $
+  SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.1, TRANSPARENCY=100)
+;Partitioning
+gh_P1 = PLOT (tJD, sim.P1, YTITLE='partitioning (into leaf)', XTITLE='Time', COLOR = 'black', XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', $
+  FONT_SIZE = fs, LAYOUT=[base_layout,6], MARGIN=margin, /CURRENT, NAME = 'P1', YRANGE=[0,1.2], XRANGE=xrange)
+
+;GPP
+;GPP modeled
+gh_modgpp = PLOT (tJD, sim.gpp, YTITLE='GPP (gC m-2 d-1)', XTITLE='Time', COLOR = 'black', XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', $
+  FONT_SIZE = fs, LAYOUT=[base_layout,7], MARGIN=margin, /CURRENT, NAME = 'simGPP', XRANGE=xrange)
+;gh_cnpp  = PLOT (tJD, sim.cnpp,  COLOR = 'green', OVERPLOT=1, NAME = 'NPP')
+;GPP meaured (Eddy data)
+gh_obsgpp = PLOT (eddy_data.JD[sind_eddy:eind_eddy], eddy_data.gpp_mds[sind_eddy:eind_eddy], OVERPLOT=1, COLOR = 'red', $
+  NAME = 'obsGPP(mds)')
+!null = LEGEND(target=[gh_modgpp, gh_obsgpp], /AUTO_TEXT_COLOR, FONT_SIZE = fs-2, POSITION=lp, /RELATIVE, $
+  SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.1, TRANSPARENCY=100)
+
+;NDVI
+;Simulated Modis NDVI
+Red_sim = REFORM(sim.ModRef[0,*])
+Nir_sim = REFORM(sim.ModRef[1,*])
+gh_sim_ndvi = PLOT (tJD, ((Nir_sim-Red_sim)/(Nir_sim+Red_sim)), YTITLE='MODIS NDVI', XTITLE='Time', COLOR = 'black', XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', $
+  FONT_SIZE = fs, LAYOUT=[base_layout,8], MARGIN=margin, /CURRENT, NAME = 'simNDVI', YRANGE=[0.0,1.0], XRANGE=xrange)
+;Observed MODIS NDVI
+gh_obs_ndvi = PLOT (satObsJD, ((Nir_obs-Red_obs)/(Nir_obs+Red_obs)), COLOR = 'red', OVERPLOT = 1, NAME = 'obsNDVI')
+!null = LEGEND(target=[gh_sim_ndvi, gh_obs_ndvi], /AUTO_TEXT_COLOR, FONT_SIZE = fs-2, POSITION=lp, /RELATIVE, $
+  SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.1, TRANSPARENCY=100)
+
+;Refletcances
+yrange = [0, MAX(sim.ModRef[*,*]+0.1, /NAN)]
+sim_names =  'sim '+STRTRIM(FLOOR(datacentwl_MODIST_7b()),2) ;['R1','R2','R3','R4','R5','R6','R7']
+obs_names =  'obs'+STRARR(7)
+gh_sim1 = PLOT(tJD, sim.ModRef[0,*], YTITLE='R', XTITLE='Time', COLOR = 'red', XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE', $
+  FONT_SIZE = fs, LAYOUT=[base_layout,9], MARGIN=margin, /CURRENT, NAME = sim_names[0], YRANGE=yrange, XRANGE=xrange)
+gh_obs1 = PLOT (satObsJD, modis_data.R1[sind_modis:eind_modis], NAME= obs_names[0], $
+  LINESTYLE='none', SYMBOL='o', SYM_SIZE = 0.3, COLOR = 'red', OVERPLOT=1)
+
+gh_sim2 = PLOT(tJD, sim.ModRef[1,*], COLOR = 'blue', OVERPLOT = 1, NAME = sim_names[1])
+gh_obs2 = PLOT (satObsJD, modis_data.R2[sind_modis:eind_modis], NAME= obs_names[1], $
+  LINESTYLE='none', SYMBOL='o', SYM_SIZE = 0.3, COLOR = 'blue', OVERPLOT=1)
+
+gh_sim3 = PLOT(tJD, sim.ModRef[2,*], COLOR = 'black', OVERPLOT = 1, NAME = sim_names[2])
+gh_obs3 = PLOT (satObsJD, modis_data.R3[sind_modis:eind_modis], NAME= obs_names[2], $
+  LINESTYLE='none', SYMBOL='o', SYM_SIZE = 0.3, COLOR = 'black', OVERPLOT=1)
+
+gh_sim4 = PLOT(tJD, sim.ModRef[3,*], COLOR = 'green', OVERPLOT = 1, NAME = sim_names[3])
+gh_obs4 = PLOT (satObsJD, modis_data.R4[sind_modis:eind_modis], NAME= obs_names[3], $
+  LINESTYLE='none', SYMBOL='o', SYM_SIZE = 0.3, COLOR = 'green', OVERPLOT=1)
+
+gh_sim5 = PLOT(tJD, sim.ModRef[4,*], COLOR = 'grey', OVERPLOT = 1, NAME = sim_names[4])
+gh_obs5 = PLOT (satObsJD, modis_data.R5[sind_modis:eind_modis], NAME= obs_names[4], $
+  LINESTYLE='none', SYMBOL='o', SYM_SIZE = 0.3, COLOR = 'grey', OVERPLOT=1)
+
+gh_sim6 = PLOT(tJD, sim.ModRef[5,*], COLOR = 'magenta', OVERPLOT = 1, NAME = sim_names[5])
+gh_obs6 = PLOT (satObsJD, modis_data.R6[sind_modis:eind_modis], NAME= obs_names[5], $
+  LINESTYLE='none', SYMBOL='o', SYM_SIZE = 0.3, COLOR = 'magenta', OVERPLOT=1)
+
+gh_sim7 = PLOT(tJD, sim.ModRef[6,*], COLOR = 'orange', OVERPLOT = 1, NAME = sim_names[6])
+gh_obs7 = PLOT (satObsJD, modis_data.R7[sind_modis:eind_modis], NAME= obs_names[6], $
+  LINESTYLE='none', SYMBOL='o', SYM_SIZE = 0.3, COLOR = 'orange', OVERPLOT=1)
+
+!null = LEGEND(target=[gh_sim1,gh_obs1,gh_sim2,gh_obs2,gh_sim3,gh_obs3,gh_sim4,gh_obs4,$
+                       gh_sim5,gh_obs5,gh_sim6,gh_obs6,gh_sim7,gh_obs7], /AUTO_TEXT_COLO, FONT_SIZE = fs-1, $
+                       POSITION=[0.28, 1.05], /RELATIVE, $
+                       SHADOW=0, LINESTYLE=6, SAMPLE_WIDTH=0.02, TRANSPARENCY=100)
+PRINT, 'Finished'                      
+END

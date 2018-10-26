@@ -1,0 +1,85 @@
+Pro yield_regress, data, path, wid
+
+  x=data.nd
+  n_records=N_ELEMENTS(x[0,*])
+  n_dek=N_ELEMENTS(x[*,0])
+  regions_ids=data.reg[UNIQ(data.reg, SORT(data.reg))]
+  n_regions=N_ELEMENTS(regions_ids)
+  regions=intarr(N_ELEMENTS(regions_ids))
+  max_nd_val_arr=dblarr(n_records)
+  max_nd_pos_arr=intarr(n_records)
+  maxLag=10;
+  n_lags=maxLag+1
+  r_0=dblarr(n_lags)
+  for i=0, n_records-1 do begin
+    max_nd_val_arr=MAX(x[*,i],ind)
+    max_nd_pos_arr[i]=ind
+  endfor
+  
+  ws=400  ;window size
+  
+  ;Data description
+  dekads=indgen(N_ELEMENTS(x[*,0]))
+  window, wid, XSIZE=ws, YSIZE=ws
+  plot, dekads,  dekads*0.0, XTITLE='dekad', YTITLE='ND', BACKGROUND = 16777215, COLOR = 0, $
+    yrange=[0.1,0.7], title='0 ND for regions'
+  for re=0, n_regions-1 do begin
+    ind_re=where(data.reg eq regions_ids[re], n_years)
+    x1=x[*,ind_re]
+    for ye=0, n_years-1 do begin
+      oplot, dekads, x1[*,ye], color=5000*re
+    endfor
+  endfor  
+  print, 'terminated'
+  
+  ;Data analysis
+  ;1 search for best lag 
+  ;1.1 all regions, all years
+  
+  
+  for l=0, maxLag do begin
+    ;sum from max-lag to max
+    d0=max_nd_pos_arr-l
+    ind_neg=WHERE(d0 lt 0, count)
+    if count ne 0 then d0[ind_neg]=0 
+    sum_nd=sum_d0_d1(x, d0, max_nd_pos_arr)
+    coeff = REGRESS( sum_nd, reform(data.yield),CORRELATION=corr)
+    r_0[l]=reform(corr)
+  endfor
+  window, wid+1, XSIZE=ws, YSIZE=ws
+  plot, indgen(maxLag), r_0, XTITLE='lag to max', YTITLE='r', BACKGROUND = 16777215, COLOR = 0, $
+    yrange=[0.4,0.7], title='1.1 all regions'
+  ;oplot, indgen(maxLag), indgen(maxLag)*0.0+r_1[0], color=3000
+  
+  ;1.2 region by region
+   
+   r_1=dblarr(n_lags)
+   max_r_for_region=dblarr(n_regions)
+   window, wid+2, XSIZE=ws, YSIZE=ws
+   plot, indgen(maxLag),  indgen(maxLag)*0.0, XTITLE='lag to max', YTITLE='r', BACKGROUND = 16777215, COLOR = 0, $
+   yrange=[0.1,1.0], title='1.2 region by region'
+   
+   for re=0, n_regions-1 do begin
+     ind_re=where(data.reg eq regions_ids[re])
+     regions[re]=regions_ids[re]
+     x1=x[*,ind_re]
+     max_nd_pos_arr1=max_nd_pos_arr[ind_re]
+     yield1=data.yield[ind_re]
+     for l=0, maxLag do begin
+      ;sum from max-lag to max
+      d0=max_nd_pos_arr1-l
+      ind_neg=WHERE(d0 lt 0, count)
+      if count ne 0 then d0[ind_neg]=0 
+      sum_nd=sum_d0_d1(x1, d0, max_nd_pos_arr1)
+      coeff = REGRESS( sum_nd, reform(yield1),CORRELATION=corr)
+      r_1[l]=reform(corr)
+     endfor
+     max_r_for_region[re]=MAX(r_1)
+     oplot, indgen(maxLag), r_1, color=5000*re
+   endfor
+   write_csv, path+'\'+strtrim(wid,2)+'_r4regions.csv', regions, max_r_for_region, HEADER=['region','r_max']  
+  
+  
+
+
+End

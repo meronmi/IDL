@@ -1,0 +1,97 @@
+NAME:
+	EXAMPLES
+
+PURPOSE:
+	To provide commented examples of the use of the 2stream
+	executable. 
+
+NOTATIONS:
+	Throughout this document, it is assumed the executable is named 2stream
+	and that it can be reached as-is by the executing shell (e.g. via the 
+	PATH) system variable. 
+	The string [:prompt:] stands for the user's command-line prompt.
+	The string stderr>> introduces a message written on the standard error.
+        The string stdout>> introduces a message written on the standard output.
+
+EXAMPLES LIST:
+[00] Default execution.
+[01] Purely collimated source, black background model.
+[02] Purely collimated source, with a non black background.
+[03] Purely isotropic source.
+[04] Heterogeneous canopy (zeta and zeta* factors).
+[05] Heterogeneous canopy (zeta and zeta* factors).
+[06] Several methods to specify rl and tl. 1/4
+[07] Several methods to specify rl and tl. 2/4
+[08] Several methods to specify rl and tl. 3/4
+[09] Several methods to specify rl and tl. 4/4
+[10] Mixed direct+diffuse radiation.
+[11] Homogeneous canopy with a planophile LND.
+[12] Understanding the output line (-O option).
+[13] Customizing the output line (-o option).
+
+EXAMPLES:
+[00] [:prompt:] 2stream
+	Run the 2stream model with default values for all its input parameters.
+	
+[01] [:prompt:] 2stream -r 0.1 -t 0.12 -l 1.2 -s 30 
+	Run the black background model (-g flag is indeed omitted) with a purely collimated 
+	source at zenith angle 30 degrees. The leaf reflectance is 0.1, the leaf transmittance
+	is 0.12. The canopy's LAI is 1.2.
+
+[02] [:prompt:] 2stream -g 0.179 -r 0.49 -t 0.36 -l 2.53 -s 0 
+	Run the two stream model with a purely collimated source at zenith angle 0 degrees. 
+	The background reflectance is 0.179, the leaf reflectance is 0.49 and the leaf 
+	transmittance is 0.36. The canopy's LAI is 2.53.
+
+[03] [:prompt:] 2stream -g 0.812 -r 0.49 -t 0.36 -l 0.53 -s iso
+	Run the two stream model with a purely isotropic source. 
+	The background reflectance is 0.812, the leaf reflectance is 0.49 and the leaf 
+	transmittance is 0.36. The canopy's LAI is 0.53.
+
+[04] [:prompt:] 2stream -l 3.0 -z 0.6 -g 0.812 -r 0.49 -t 0.36 -s 25
+        The true LAI is 3.0 whereas the structure factor zeta for the selected sun angle
+	(25 degrees) is 0.6. zeta* is also 0.6 as it is omitted on the command line.
+	LAItilde=1.8 and LAI*=1.8.
+
+[05] [:prompt:] 2stream -l 3.0 -z 0.6 -z* 0.73 -g 0.812 -r 0.49 -t 0.36 -s 25
+        Same as in {04} but the structure factor zeta* is different from zeta at 
+	25 degrees (which is 0.6).
+	LAItilde=1.8 and LAI*=2.19.
+
+[06] [:prompt:] 2stream -r 0.12 -t 0.15 -l 3.0 -z* 0.83 -s iso
+	The leaf reflectance and transmittance are explicitely set to 0.12 (resp. 0.15).
+
+[07] [:prompt:] 2stream -r 0.12 -w 0.27 -l 3.0 -z* 0.83 -s iso
+	The leaf reflectance and transmittance have the same values as in {06} as
+	wl=rl+tl=0.27
+
+[08] [:prompt:] 2stream -t 0.15 -d 0.8 -l 3.0 -z* 0.83 -s 30
+	The leaf reflectance and transmittance have the same values as in {06} as
+	dl=rl/tl=0.8
+
+[09] [:prompt:] 2stream -w 0.27 -d 0.8 -l 3.0 -z* 0.83 -s iso
+	The leaf reflectance and transmittance have the same values as in {06} as
+	dl=rl/tl=0.8 and wl=rl+tl=0.27
+
+[10] [:prompt:] 2stream -s 67 -F 0.2 -r 0.12 -d 0.8 -l 3.0 -g 0.243
+	The source of radiation is mixed: 80% collimated at 67 degrees and 20% isotropic.
+
+[11] [:prompt:] 2stream --plano -s 50 -r 0.4957 -t 0.4409 -g 0.159 -l 3.0
+	Simulates a canopy with a planophile Leaf Normal Distribution. rl is 0.4957, 
+	tl is 0.4409. The LAI is 3.0 and the background reflectance is 0.159.
+	This corresponds to RAMI (http://rami-benchmark.jrc.it) experiment HOM03_TUR_PLA_NIR_20.
+
+[12] [:prompt:] 2stream -O -w 0.27 -d 0.8 -l 3.0 -z* 0.83 -s iso
+     stderr>>sun{1}  fdiff{2}  <lai>{3}  zeta{4}  zeta*{5}  rgbd{6}  rleaf{7}  tleaf{8}  Alb{9}  Abs{10}  Tran{11}
+     stdout>>333.00   1.000     3.000     0.830    0.830    0.0000   0.1200    0.1500   0.061225 0.727850 0.196279
+     	The -O (capital o) flag issues a line on stderr to describes the results line (which is sent on stdout). 
+	The first 8 columns are to recall the input parameters. Note that sun is 333.00 because the
+	illumination is purely isotropic and that zeta is equal to zeta*. Columns 9,10,11 are, by default,
+	the total albedo, absorption and transmittance calculated by the model.
+
+[13] [:prompt:] 2stream -O -o "%Tran_t2 %Alb_t2" -w 0.27 -d 0.8 -l 1.5 -g 0.82 -s 20
+     stderr>>sun{1}  fdiff{2}  <lai>{3}  zeta{4}  zeta*{5}  rgbd{6}  rleaf{7}  tleaf{8}  Tran_t2{9}  Alb_t2{10}
+     stdout>>20.00    0.000    1.500     1.000    1.000     0.8200   0.1200     0.1500    0.450168    0.114261
+        For this run, only the black canopy (term T2) transmission and albedo were reported on 
+	columns 9 and 10. This correponds to the radiation that did not interact with the 
+	vegetation canopy, travelling in-between the gaps.

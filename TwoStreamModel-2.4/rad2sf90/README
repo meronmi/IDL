@@ -1,0 +1,48 @@
+NAME:
+	README
+
+PURPOSE:
+	This file provides general information about the rad2sf90 package, 
+	written with the F90 language. It implements the low-level 
+	two-stream based radiation transfer routines (2s) in vegetation
+	canopies. 
+
+AUTHORS:
+	Thomas Lavergne and Bernard Pinty
+	Address: GVM Unit / IES / EC-Joint Research Centre
+	         Via E. Fermi 1
+		 21020 Ispra (VA)
+		 Italy
+	E-Mail:  Bernard Pinty   : bernard.pinty_AT_jrc.it
+	         Thomas Lavergne : thomas.lavergne_AT_jrc.it
+
+REFERENCES:
+	B. Pinty, T. Lavergne, R.E. Dickinson, J-L. Widlowski, N. Gobron and M. M. Verstraete (2005).
+	Simplifying the Interaction of Land Surfaces with Radiation for Relating Remote Sensing Products 
+	to Climate Models. Journal of Geophysical Research. in press.
+
+
+CONTENTS:
+	The rad2sf90 package contains:
+
+	README
+		this file.
+		
+	black_background.f
+		Module which contains routines to calculate the reflectance,
+		transmittance and absorption by a vegetation canopy
+		over a totally absorbing (black) background.
+
+        black_canopy.f
+		Modeul which contains the routines to calculate the reflectance
+		and transmittance through a black vegetation canopy.
+
+	gammaproc.f
+		implements the low-level routines for the calculation 
+		of the gamma coefficients to enter the black background 
+		formulation.
+
+NOTES:
+	Some inline comments cite equation numbers to be found in the reference cited above (REFERENCES). 
+	However, these equation numbers could be not accurate (several re-formatting of the manuscript).
+	These comments will be fixed as soon as the definitive version of the article is in press.

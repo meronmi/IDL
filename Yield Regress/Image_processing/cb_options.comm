@@ -1,0 +1,5 @@
+COMMON options, excludeDepts, excludeYears, $
+				MinPixPerDept, MinCropFract, UseMaxFaparThreshold, $
+              	MaxFaparThreshold, UseCropMask, ComputeSurface, $
+              	pheno_products, pheno_val999, dept_ids, yield_Year_4_frst_RS_band, $
+              	doplot, verbose, deleteWindows

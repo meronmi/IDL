@@ -1,0 +1,227 @@
+FUNCTION funct2min_interpolJD, p, PROSAILVAR=prosailVar, RSOIL=rsoil, TJD=tJD, $
+  GLOBRADVAR=globrad, GLOBRAD2PAR=globrad2par, TAIR=tair, $
+  SATOBSJD=satObsJD, SATOBSRAA=satObsRAA, SATOBSSZA=satObsSZA, SATOBSVZA=satObsVZA, $
+  ROBS=robs, ERR = err
+  proSailVar = { $
+    Cab    : prosailVar[0],$
+    Car    : prosailVar[1],$
+    Cbrown : prosailVar[2],$
+    Cw     : prosailVar[3],$
+    Cm     : prosailVar[4],$
+    Ns     : prosailVar[5],$
+    lidf_a : prosailVar[6],$
+    lidf_b : prosailVar[7],$
+    lai    : prosailVar[8],$
+    hspot  : prosailVar[9],$
+    tts    : prosailVar[10],$
+    tto    : prosailVar[11],$
+    psi    : prosailVar[12],$
+    rsoil  : rsoil}
+    
+  
+  JD0a=FLOOR(p[0]) 
+  IF ((p[0] MOD 1 NE 0.0)) THEN JD0b=CEIL(p[0]) 
+  laiDOY0=p[1] & SLA=p[2] & eps_max=p[3] & gamma=p[4]
+  c=p[5]  & d=p[6]       & a=p[7]   & b=p[8]       & tb=p[9]
+  ;PRINT, FORMAT='("JD0 in funct", F14.4, " laiDOY0 = ", F17.15, " SLA = ", F17.15)',  p[0], p[1], p[2] 
+  ;very bad shortcut to avoid asking a JD0 out of sample (make the cost function proportional to the distance)
+  ;IF (JD0 GT  MAX(tJD) OR JD0 LT  MIN(tJD))THEN RETURN, 100 * MIN([ABS(JD0-MAX(tJD)),ABS(JD0-MIN(tJD))])
+ 
+  IF (JD0a GT  MAX(tJD) OR JD0a LT  MIN(tJD))THEN BEGIN
+    ;This should neer happen as parametrs are bounded, stop if it is the case
+    STOP
+  ENDIF
+  sima = simForwMod(JD0a, laiDOY0, SLA, eps_max, gamma, c, d, a, b, tJD, globrad, globrad2par, tair, tb, proSailVar, satObsJD, satObsRAA, satObsSZA, satObsVZA)
+  
+  ;return sim has the dimension of tJD. 
+  ;Only those corresponding to must be compared to MODIS observation to build the cost function
+  
+  ;find the index on obs and sim to be compared 
+  indobs = WHERE(FINITE(satObsJD), count)
+  obsJD = satObsJD[indobs]
+  indsim = !NULL
+  FOR i = 0, count-1 DO indsim = [indsim, WHERE(tJD EQ obsJD[i])]
+  ;obsJD = satObsJD[indobsa]
+  Red_sim = REFORM(sima.ModRef[0,indsim])
+  Nir_sim = REFORM(sima.ModRef[1,indsim])
+  NDVI_sim = (Nir_sim-Red_sim)/(Nir_sim+Red_sim)
+  Red_obs = REFORM(robs[0,indobs])
+  Nir_obs = REFORM(robs[1,indobs])
+  NDVI_obs = (Nir_obs-Red_obs)/(Nir_obs+Red_obs)
+  ;fa = TOTAL((NDVI_sim-NDVI_obs)^2, /NAN, /DOUBLE)
+  fa = (NDVI_obs - NDVI_sim) / err[indobs] 
+  f = fa
+  IF ((p[0] MOD 1 NE 0.0)) THEN BEGIN
+    simb = simForwMod(JD0b, laiDOY0, SLA, eps_max, gamma, c, d, a, b, tJD, globrad, globrad2par, tair, tb, proSailVar, satObsJD, satObsRAA, satObsSZA, satObsVZA)
+    Red_sim = REFORM(simb.ModRef[0,indsim])
+    Nir_sim = REFORM(simb.ModRef[1,indsim])
+    NDVI_sim = (Nir_sim-Red_sim)/(Nir_sim+Red_sim)
+    Red_obs = REFORM(robs[0,indobs])
+    Nir_obs = REFORM(robs[1,indobs])
+    NDVI_obs = (Nir_obs-Red_obs)/(Nir_obs+Red_obs)
+    ;fb = TOTAL((NDVI_sim-NDVI_obs)^2, /NAN, /DOUBLE)
+    fb = (NDVI_obs - NDVI_sim)  / err[indobs] 
+    ;lineraly interpolate
+    IF (N_ELEMENTS(fa) NE N_ELEMENTS(fb)) THEN STOP
+    f = fa + ((fb-fa)/(JD0b-JD0a)) * (p[0]-JD0a)
+    ;PRINT, FORMAT='("JD0 in funct (then interpol)", F14.4)',  p[0]
+  ENDIF ;ELSE PRINT, FORMAT='("JD0 in funct", F14.4)',  p[0]
+  RETURN, f
+END
+
+
+
+FUNCTION InvWrapper, parinfo, fg, tJD, globrad, globrad2par, tair, proSailVar, $
+                     satObsJD, satObsRAA, satObsSZA, satObsVZA, $
+                     r1, r2, r3, r4, r5, r6, r7, uppEnvFit
+;Inversion manager
+;questa funzione riorganizza i parametri e li passa a funct2min che chima simFORWDmodel, calcola gli scarti delle riflettanze e
+;ritorna un solo valore f
+
+iMax = 10  ;maximum number of iteration for upper envelope adaptattion
+it  = 1    ;iteration counter for upper envelop fit
+TIC
+
+weights = satObsJD * 0.0 + 1.0
+
+fcnargs = {PROSAILVAR:[proSailVar.Cab,proSailVar.Car,proSailVar.Cbrown,proSailVar.Cw,proSailVar.Cm, $
+           proSailVar.Ns,proSailVar.lidf_a,proSailVar.lidf_b,proSailVar.lai,proSailVar.hspot, $
+           proSailVar.tts,proSailVar.tto,proSailVar.psi],$
+           RSOIL: proSailVar.rsoil, $
+           TJD:tJD, GLOBRADVAR:globrad, GLOBRAD2PAR:globrad2par, TAIR:tair, $
+           SATOBSJD:satObsJD, SATOBSRAA:satObsRAA, SATOBSSZA:satObsSZA, SATOBSVZA:satObsVZA, $
+           ROBS: [TRANSPOSE(r1), TRANSPOSE(r2), TRANSPOSE(r3), TRANSPOSE(r4), TRANSPOSE(r5), $
+           TRANSPOSE(r6), TRANSPOSE(r7)], ERR:1.0/weights}
+
+functName = 'funct2min_interpolJD'; 'funct2min'
+
+   
+;**** debug +
+;debug_lin_search = 0
+;compute Chi-squre for any paramneter value, step 1 if doy, step 1/100 dynamic range if other
+;;e.g, doy, from  2454261.0  to   2454381.0
+;IF (debug_lin_search) EQ 1 THEN BEGIN
+;  i = 0  ;(o is doy, 1 is layDOY0)
+;  IF (i EQ 0) THEN BEGIN
+;    chi2 = FLTARR(parinfo[i].LIMITS[1]-parinfo[i].LIMITS[0]+1) 
+;    step = 1.0
+;  ENDIF ELSE BEGIN
+;    chi2 = FLTARR(100)
+;    step = (parinfo[i].LIMITS[1]-parinfo[i].LIMITS[0]) / 100.0
+;  ENDELSE
+;  tmp = fg[i]
+;  PRINT, '*DEBUG'
+;  PRINT, 'Start linear search bewteen DOY: ', LONG(parinfo[0].LIMITS[0])
+;  PRINT, 'and DOY:                         ', LONG(parinfo[0].LIMITS[1])
+;  ;FOR t = parinfo[0].LIMITS[0], parinfo[0].LIMITS[1] DO BEGIN
+;  FOR t = 0, N_ELEMENTS(chi2)-1 DO BEGIN
+;    fg[i] = parinfo[i].LIMITS[0] + t * step
+;    dev = funct2min_interpolJD(fg, _EXTRA = fcnargs)
+;    chi2[t]=TOTAL(dev^2, /DOUBLE)
+;    ;return, fg
+;  ENDFOR
+;  x = INDGEN(N_ELEMENTS(chi2)) * step + parinfo[i].LIMITS[0]
+;  IF (i EQ 0) THEN BEGIN
+;    dummy = LABEL_DATE(DATE_FORMAT=['%D/%N','%Y'])
+;    gh = PLOT(LONG(x), chi2, FONT_SIZE =8, XTICKUNITS = ['Time', 'Time'], XTICKFORMAT='LABEL_DATE')
+;  ENDIF ELSE BEGIN
+;    gh = PLOT(x, chi2, FONT_SIZE =8, XTITLE = 'p('+STRTRIM(i,2)+')')
+;  ENDELSE
+;  fg[i]= tmp
+;ENDIF
+;;**** debug -
+
+
+;Perform normal or upper envelop fit
+IF (uppEnvFit NE 1) THEN BEGIN
+  parms = MPFIT(functName, fg, FUNCTARGS=fcnargs, NFEV=nfev, $
+                MAXITER=500, ERRMSG=errmsg, $; NPRINT=nprint, QUIET=quiet, FTOL=1.D-3, XTOL=xtol, GTOL=gtol, NITER=niter,
+                STATUS=status, $;ITERPROC=iterproc, ITERARGS=iterargs,
+                COVAR=covar, PERROR=perror, BESTNORM=bestnorm, NPEGGED = npegged, $
+                PARINFO=parinfo, PFREE_INDEX = pfree_index, /AUTODERIVATIVE, /QUIET)
+ENDIF ELSE BEGIN
+  ; Upper Fnvelope Fit
+  ; Start with the first fitting
+  parms = MPFIT(functName, fg, FUNCTARGS=fcnargs, NFEV=nfev, $
+                MAXITER=500, ERRMSG=errmsg, $; NPRINT=nprint, QUIET=quiet, FTOL=1.D-3, XTOL=xtol, GTOL=gtol, NITER=niter,
+                STATUS=status, $;ITERPROC=iterproc, ITERARGS=iterargs,
+                COVAR=covar, PERROR=perror, BESTNORM=bestnorm, NPEGGED = npegged, $
+                PARINFO=parinfo, PFREE_INDEX = pfree_index, /AUTODERIVATIVE, /QUIET)
+  ;return code 10 if unable to fit, store results otherwise
+  IF (status LE 0) THEN BEGIN
+    PRINT, 'Try MPFIT_RESET_RECURSION id the execution was stopped because of recursion'
+    RETURN, 10 
+  ENDIF 
+  ;store the output
+  last_parms = parms & last_npegged = npegged & last_pfree_index = pfree_index 
+  last_bestnorm = bestnorm & last_status = status
+  ;weights calculation (remember that mpfit takes err = 1 / weights
+  ;compute the function values
+  JD0=FLOOR(parms[0]) & laiDOY0=parms[1] & SLA=parms[2] & eps_max=parms[3] & gamma=parms[4]
+  c=parms[5]  & d=parms[6]       & a=parms[7]   & b=parms[8]  & tb=parms[9]
+  sim = simForwMod(JD0, laiDOY0, SLA, eps_max, gamma, c, d, a, b, tJD, globrad, globrad2par, tair, tb, proSailVar, satObsJD, satObsRAA, satObsSZA, satObsVZA)   
+  ;find the index on obs and sim to be compared
+  indobs = WHERE(FINITE(satObsJD), count)
+  obsJD = satObsJD[indobs]
+  indsim = !NULL
+  FOR i = 0, count-1 DO indsim = [indsim, WHERE(tJD EQ obsJD[i])]
+  yfit = (sim.ModRef[1,indsim]-sim.ModRef[0,indsim])/(sim.ModRef[1,indsim]+sim.ModRef[0,indsim])
+  yobs = (fcnargs.robs[1,indobs]-fcnargs.robs[0,indobs])/(fcnargs.robs[1,indobs]+fcnargs.robs[0,indobs])
+ 
+  ;computation for weights
+  UEF_weights_and_fit_effect, yobs, yfit, indobs, weights, fit_effect
+  weights0 = weights
+  fit_effect0 = fit_effect
+  
+  WHILE  (fit_effect LE fit_effect0) AND (it LT imax) DO BEGIN 
+    ;Recompute the weights loop until the point where the fitting effect index is minimum (stop at iteration before it starts to increase)
+    ;Fit again with updated weights
+    ;some special care to avoid division by 0 (for the observation having 0 weight)
+    ind0 = WHERE(weights EQ 0.0, count0)
+    IF (count0 GT 0) THEN weights[ind0] = 1.D-6
+    fcnargs.err = 1.0 / weights
+    parms = MPFIT(functName, fg, FUNCTARGS=fcnargs, NFEV=nfev, $
+                  MAXITER=500, ERRMSG=errmsg, $; NPRINT=nprint, QUIET=quiet, FTOL=1.D-3, XTOL=xtol, GTOL=gtol, NITER=niter,
+                  STATUS=status, $;ITERPROC=iterproc, ITERARGS=iterargs,
+                  COVAR=covar, PERROR=perror, BESTNORM=bestnorm, NPEGGED = npegged, $
+                  PARINFO=parinfo, PFREE_INDEX = pfree_index, /AUTODERIVATIVE, /QUIET)
+    IF (status LE 0) THEN BEGIN
+      ;optimization failed, take last succesfull attempt
+      parms = last_parms & npegged = npegged & pfree_index = last_pfree_index 
+      bestnorm = last_bestnorm & status = last_status
+      info_mpfit = info_mpfit_str(status, Bestnorm, npegged, pfree_index, parms, parinfo, fg, uppEnvFit, it)
+      ret = {parms:parms, info_mpfit:info_mpfit}
+      RETURN, ret
+    ENDIF
+    ;store the output
+    last_parms = parms & last_npegged = npegged & last_pfree_index = pfree_index
+    last_bestnorm = bestnorm & last_status = status
+    ;compute the function values
+    JD0=FLOOR(parms[0]) & laiDOY0=parms[1] & SLA=parms[2] & eps_max=parms[3] & gamma=parms[4]
+    c=parms[5]  & d=parms[6]       & a=parms[7]   & b=parms[8]  & tb=parms[9]
+    sim = simForwMod(JD0, laiDOY0, SLA, eps_max, gamma, c, d, a, b, tJD, globrad, globrad2par, tair, tb, proSailVar, satObsJD, satObsRAA, satObsSZA, satObsVZA)
+    yfit = (sim.ModRef[1,indsim]-sim.ModRef[0,indsim])/(sim.ModRef[1,indsim]+sim.ModRef[0,indsim])
+    yobs = (fcnargs.robs[1,indobs]-fcnargs.robs[0,indobs])/(fcnargs.robs[1,indobs]+fcnargs.robs[0,indobs])
+    ;computation for weights
+    fit_effect0 = fit_effect
+    UEF_weights_and_fit_effect, yobs, yfit, indobs, weights, fit_effect
+    it ++
+  ENDWHILE
+ENDELSE
+
+IF (status LE 0) THEN BEGIN
+  PRINT, errmsg
+  ;when it sees a problem of recursion run the command 
+  ;MPFIT_RESET_RECURSION
+  ;at command line
+  PRINT, 'Try MPFIT_RESET_RECURSION id the execution was stopped because of recursion'
+  RETURN, 10
+ENDIF
+
+
+;FOR i=0, N_ELEMENTS(info_mpfit)-1 DO PRINT, info_mpfit[i] 
+TOC
+info_mpfit = info_mpfit_str(status, Bestnorm, npegged, pfree_index, parms, parinfo, fg, uppEnvFit, it)
+ret = {parms:parms, info_mpfit:info_mpfit}
+RETURN, ret
+END

@@ -1,0 +1,72 @@
+FUNCTION accFromParam, pVec, tVec, threshSOStype, threshSOS, threshEOStype, threshEOS, year
+
+;Builds all the require pheno indicators form the 7+2 DHTM parameters:
+;pdhtf_base
+;pdhtf_amp1
+;pdhtf_sft1
+;pdhtf_slo1
+;pdhtf_amp2
+;pdhtf_sft2
+;pdhtf_slo2
+;gsinistart
+;gsiniend
+;which are all stored as multi-band (multi-year) bil images
+
+;INPUT:
+;- pVec: 7 parameters of the DHT mode
+;- tVec: time axis limits (gsinistart, gsiniend) where the DHT model was fitted
+;  time is JD! not dekads
+;- threshSOS(EOS)type: defines if the threshold used to compute SOS (EOS) is in % of amplitude (decay)
+;  (threshSOS(EOS)type='%') or as DOY (threshSOS(EOS)type='DOY')
+;- threshSOS(EOS): the threshold, either in % or in DOY according to threshSOS(EOS)typ
+
+;PARAMETERS
+resampling = 1               ;factor to resample the time axis to get more precise results (here we go wihin th day, not really useful..)
+
+
+;Computation
+dt=1.0/DOUBLE(resampling)
+time = tVec[0] + INDGEN(tVec[1]-tVec[0]+1)
+;increase the sampling distance for more precise results
+timeHR=(FINDGEN((N_ELEMENTS(time)-1)*resampling+1)+time[0]*resampling)/DOUBLE(resampling)
+;compute the fitted DHT curve
+pdhtf, timeHR, pVec, fittedHR
+;extract the relevant indicators according the thresholds
+;value and position of the maximum value on the fitted curve
+fitmax = MAX(fittedHR, fitmax_idx)
+
+fitmin1 = fittedHR [0]
+fitmin2 = fittedHR [N_ELEMENTS(fittedHR)-1]
+
+;lower integration limits
+CASE threshSOStype OF
+  '%':BEGIN
+      relstart = WHERE(fittedHR [0:fitmax_idx] GE fitmin1 + (fitmax - fitmin1) * threshSOS/100.0, cnt)
+      startgs = relstart [0]
+    END
+  'DOY':BEGIN
+      threshSOSJD = DOY_YEAR2JD(threshSOS, year)
+      relstart = WHERE(timeHR GE threshSOS, cnt)
+      IF (cnt EQ 0) THEN STOP ELSE startgs = relstart [0]
+    END
+  ELSE: STOP
+ENDCASE
+
+CASE threshEOStype OF
+  '%':BEGIN
+      relstop = WHERE(fittedHR [fitmax_idx:(N_ELEMENTS(fittedHR)-1)] GE fitmin2 + (fitmax - fitmin2) * threshSOS/100.0, cnt)
+      stopgs = fitmax_idx + relstop [(N_ELEMENTS(relstop) - 1)]
+   END
+  'DOY':BEGIN
+        threshEOSJD = DOY_YEAR2JD(threshEOS, year)
+        relstop = WHERE(timeHR GE threshEOSJD, cnt)
+        IF (cnt EQ 0) THEN STOP ELSE stopgs = relstop [0]
+    END
+  ELSE: STOP
+ENDCASE
+
+acc=TOTAL(fittedHR[startgs:stopgs]*dt, /DOUBLE)
+accb=TOTAL((fittedHR[startgs:stopgs]-fitmin1)*dt, /DOUBLE)
+
+RETURN, [acc, accb]
+END

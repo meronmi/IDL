@@ -1,0 +1,128 @@
+PRO phenot
+
+;  Purpose:
+;     To organize and carry out the calculations required to estimate the
+;     characteristics of the growing seasons for a given site, on the basis of
+;     a 1-dimensional time series of FAPAR values for one or more years. The
+;     analysis to be carried out is specified through a configuration file (see
+;     below). Input data are provided through an external ASCII file, while
+;     output is generated on screen as well as in files saved on disk.
+
+;  Usage:
+;     1. Edit the initialization file 'phenot.job' to specify the job to be
+;        completed (names and locations of input and output files, values of
+;        processing parameters, etc).
+;     2. Check that the specified input and output directories, as
+;        well as the input data file(s), all exist.
+;     3. Build the project 'phenot'.
+;     4. Run 'phenot'.
+
+;  Remarks:
+;     1. Handling of exception conditions:
+;        - Incorrect or unexpected conditions that can be corrected (or do not
+;          prevent further processing) result in warnings which are reported on
+;          screen; corrective action is taken where appropriate, and processing
+;          continues.
+;        - Whenever they are detected, fatal (unrecoverable) conditions result
+;          (i) in error messages reported on screen, and
+;          (ii) in the closing of all open files before stopping the program.
+;        - If a fatal error is encountered without prior detection, it is
+;          recommended to explicitly close all files before proceeding further,
+;          to recover as much information as possible in the output file(s).
+;        - Under IDL 7.x, diagnostic features previously built in earlier
+;          versions the code are obsolete: they are replaced by the interactive
+;          capability of the Eclipse Workbench.
+;     2. Handling of output:
+;        - Each run of the program generates one or more output files located
+;          in a dedicated subdirectory of '~/Science/Pheno/Products'.
+;        - Plots and figures generated on screen are also saved in
+;          corresponding graphics files of that output directory.
+
+;  History:
+;     Version 1.0: This routine is an updated version of 'gs6t.pro',
+;        ported to IDL 7.0 on 23 September 2008.
+;     Version 1.1: Structure of calls and handling of exceptions updated
+;        on 6 March 2009.
+;     Version 1.2: Port under Suse Linux (starting February 2010).
+
+;MM+
+@cb_options.comm  ;used to control vrbs and pltres
+@cb_in.comm       ; use to access fapar and replace NaN
+@cb_pdhtf.comm    ;used to access fract_thresh1 and 2
+@cb_stat.comm     ;used to access faprangeminthresh
+vrbs=1          ;used to control text outputs
+pltres=1        ;used to control plots to windows
+use_lomb=0  ;at the moment it is just computed, not really used
+run_nrt=0   ;set to 1 it perform nrt monitoring
+fst_dec=10  ;tell the code which is the first decade in the record
+PRINT, 'Warning: fst_dec set to '+strtrim(fst_dec,2)
+
+fract_thresh=0.20 ;fraction of amplitued use to compute start and stop in pdhtf
+fract_thresh2=0.80 ;fraction of amplitued use to compute the second stop in pdhtf
+;  Set the expected minimum variability value to 0.15 because the typical
+;  accuracy of FAPAR estimates is about 0.1 (in absolute value): The observed
+;  variability must thus significantly exceed the possible level of noise.
+;  WARNING: This value is valid only for FAPAR. For a more generic code, it may
+;  be more appropriate to test for such a difference larger than some value
+;  depending on the intrinsic declared accuracy of that variable instead.
+;  Action: If the variability is too low, return to the calling routine as the
+;  rest of the calculations are appropriate only for seasonal time series.
+;MM+ was not running on part of the Niger profiles because faprangeminthresh was set to 0.15
+faprangeminthresh = 0.10
+
+
+
+;  Phase 0: Configuration and initialization, opening of main output file:
+rc = phenot_p0()
+
+;  If no unrecoverable errors were encountered during Phase 0, proceed with
+;  Phase 1: Acquire the input data and optionally plot the raw data:
+IF (rc LT 10) THEN BEGIN
+   rc = phenot_p1()
+   
+   ;MM+
+   ;NaN are noy handled by MV code. set them to -999 which is handled (is below ibel)
+   nan_ind=where(finite(fapar) eq 0, count_nan)
+   if (count_nan gt 0) then fapar[nan_ind]=-999
+   ;convert all ibel iabo to NaN for use of standard IDL routines
+   nanfapar=fapar
+   ind_nan=where((fapar lt ibel) or (fapar gt iabo), count_nan)
+   if (count_nan gt 0) then nanfapar[ind_nan]=!VALUES.F_NAN
+   ;MM-
+   
+;  If no unrecoverable errors were encountered during Phase 1, proceed with
+;  Phase 2: Compile and plot statistical information on the FAPAR time series:
+   IF (rc EQ 0) THEN BEGIN
+      rc = phenot_p2()
+
+;  If no unrecoverable errors were encountered during Phase 2, proceed with
+;  Phase 3: Fit a mathematical model to the yearly data to simulate the
+;  growth and decay of vegetation:
+      IF (rc EQ 0) THEN BEGIN
+        ;rc = phenot_p3()
+        ;MM+
+        rc = phenot_p3_mm()
+        ;MM+ plot all
+        if (pltres eq 1) then rc=phenot_plt_all_gs()
+      ENDIF
+      ;MM+ start the analysys in prediction using exp and sigm models
+      IF (run_nrt eq 1) THEN BEGIN
+        IF (rc EQ 0) THEN BEGIN
+          rc = phenot_p4()
+        
+          ;if (pltres eq 1) then rc=phenot_plt_all_gs()
+        ENDIF
+      ENDIF
+      ;MM-
+   ENDIF
+ENDIF
+
+
+
+
+
+CLOSE, /ALL
+
+PRINT, '*** phenot.pro [INFO]: Task completed.'
+
+END

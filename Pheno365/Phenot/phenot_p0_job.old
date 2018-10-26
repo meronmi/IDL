@@ -1,0 +1,177 @@
+FUNCTION phenot_p0_job
+
+;  Purpose:
+;     To open and read the run configuration file, and to specify the analysis
+;     to be made.
+
+;  Outcome:
+;     The cb_job common block is declared and the variables describing the run
+;     to be performed are initialized.
+
+;  Usage:
+;     rc = phenot_p0_job()
+
+;  Input parameters: None.
+
+;  Output parameters: None.
+
+;  Return values:
+;     0: Normal completion.
+;     1: Warning: The input directory specification was not properly
+;        formatted in the initialization file. Problem corrected by
+;        appending a dirsep character.
+;     2: Warning: The output directory specification was not properly
+;        formatted in the initialization file. Problem corrected by
+;        appending a dirsep character.
+;     3: Warning: The number of years to skip (nskip) must be a
+;        positive integer. Problem corrected by setting nskip to 0.
+;     4: Warning: The total number of years to process (ntot)
+;        must be a positive integer. Problem corrected by setting
+;        ntot to 100 (equivalent to asking for the processing of all
+;        available years).
+;    10: Error: Job configuration file not found.
+;    11: Fatal error: The input directory specified in phenot.job does not exist.
+;    12: Fatal error: The input data file specified in phenot.job does not exist.
+;    13: Fatal error: The output directory specified in phenot.job does not exist.
+
+;  Remarks:
+;     - Exception conditions generate warning or error messages on
+;       the standard output device, and not in the diagnostic file,
+;       because the latter has not been opened yet.
+;     - This routine should be the first one to declare and set the
+;       variables in the cb_job common block. These values should not
+;       be further modified at any time in the current run.
+
+;  History:
+;     Version 1.0: This routine is an updated version of 'gs6t_p0_job.pro',
+;        ported to IDL 7.0 on 23 September 2008.
+;     Version 1.1: Port under Suse Linux (starting February 2010).
+
+;  Include the necessary common block(s):
+@cb_os.comm
+@cb_job.comm
+
+;  Initialize the return code for this routine and set the name of the run
+;  configuration file in the program source directory:
+retcode = 0
+;MM config_path = '~/Science/Pheno/Codes/Phenot/'
+config_path = 'D:\Users\meronmi\Documents\IDL\MV Pheno\Phenot\'
+config_fname = config_path + 'phenot.job'
+
+;  Check that the configuration file exists in the source directory:
+IF (FILE_TEST(config_fname) NE 1) THEN BEGIN
+   retcode = 10
+   PRINT, '*** phenot_p0_job.pro [ERROR]:'
+   PRINT, '    Job configuration file ' + config_fname + $
+      ' not found in the program source directory'
+   RETURN, retcode
+ENDIF
+
+;  Initialize string variables:
+input_dir = ''
+data_fname = ''
+output_dir = ''
+
+;  Open, read the configuration file, and close it:
+GET_LUN, iunit
+OPENR, iunit, config_fname
+
+READF, iunit, input_dir
+READF, iunit, data_fname
+READF, iunit, output_dir
+READF, iunit, nskip
+READF, iunit, ntot
+READF, iunit, wantplotfapar
+READF, iunit, wantplotlomb
+;READF, iunit, wantplotacorr
+READF, iunit, wantplotgs
+
+CLOSE, iunit
+FREE_LUN, iunit
+
+;  Strip any leading or trailing blanks from the string variables:
+input_dir = STRTRIM(input_dir, 2)
+data_fname = STRTRIM(data_fname, 2)
+output_dir = STRTRIM(output_dir, 2)
+
+;  Check that the input directory exists:
+IF (FILE_TEST(input_dir, /DIRECTORY) NE 1) THEN BEGIN
+   retcode = 11
+   PRINT, '*** phenot_p0_job.pro [ERROR]:'
+   PRINT, '    Input directory ' + input_dir + ' not found.'
+   RETURN, retcode
+ENDIF
+
+;  Check that the input directory is properly terminated by a directory
+;  separation character, to ease later concatenation with a filename:
+lastdirchar = STRMID(input_dir, STRLEN(input_dir) - 1, 1)
+IF (lastdirchar NE dirsep) THEN BEGIN
+   retcode = 1
+   PRINT, '*** phenot_p0_job.pro [WARNING]:'
+   PRINT, '    The input directory [' + input_dir + '] in ' + config_fname
+   PRINT, '    should end with a ' + dirsep + ' character.'
+   input_dir = input_dir + dirsep
+ENDIF
+
+;  Check that the input data file exists:
+IF (FILE_TEST(input_dir + data_fname) NE 1) THEN BEGIN
+   retcode = 12
+   PRINT, '*** phenot_p0_job.pro [ERROR]:'
+   PRINT, '    Input data file ' + input_dir + data_fname + ' not found.'
+   RETURN, retcode
+ENDIF
+
+;  Check that the output directory exists:
+IF (FILE_TEST(output_dir, /DIRECTORY) NE 1) THEN BEGIN
+   PRINT, '*** phenot_p0_job.pro [ERROR]:'
+   PRINT, '    Output directory ' + output_dir + ' not found.'
+   retcode = 13
+   RETURN, retcode
+ENDIF
+
+;  Check that the output directory is properly terminated by a directory
+;  separation character, to ease later concatenation with a filename:
+lastdirchar = STRMID(output_dir, STRLEN(output_dir) - 1, 1)
+IF (lastdirchar NE dirsep) THEN BEGIN
+   PRINT, '*** phenot_p0_job.pro [WARNING]:'
+   PRINT, '    The output directory [' + output_dir + '] in ' + config_fname
+   PRINT, '    should end with a ' + dirsep + ' character.'
+   output_dir = output_dir + dirsep
+   retcode = 2
+ENDIF
+
+;  Ensure that nskip and ntot are positive integers, and reset them to 0
+;  otherwise:
+nskip = FIX(nskip)
+IF (nskip LT 0) THEN BEGIN
+   PRINT, '*** phenot_p0_job.pro [WARNING]:'
+   PRINT, '    nskip was negative, has been reset to 0.'
+   nskip = 0
+   retcode = 3
+ENDIF
+ntot = FIX(ntot)
+IF (ntot LT 0) THEN BEGIN
+   PRINT, '*** phenot_p0_job.pro [WARNING]:'
+   PRINT, '    ntot was negative, has been reset to 100.'
+   ntot = 100
+   retcode = 4
+ENDIF
+
+;  Ensure that the flags to specify which graphs are to be generated
+;  are integers with a value of either 0 (output files not created)
+;  or 1 (output files created):
+wantplotfapar = FIX(wantplotfapar)
+IF (wantplotfapar NE 0) THEN wantplotfapar = 1
+
+wantplotlomb = FIX(wantplotlomb)
+IF (wantplotlomb NE 0) THEN wantplotlomb = 1
+
+;wantplotacorr = FIX(wantplotacorr)
+;IF (wantplotacorr NE 0) THEN wantplotacorr = 1
+
+wantplotgs = FIX(wantplotgs)
+IF (wantplotgs NE 0) THEN wantplotgs = 1
+
+RETURN, retcode
+
+END

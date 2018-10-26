@@ -1,0 +1,14 @@
+prendere tutti e due
+MOD09Q1.006 Surface Reflectance 8-Day Global 250m
+ImageCollection ID
+MODIS/006/MOD09Q1
+MYD09Q1.006 Surface Reflectance 8-Day L3 Global 250m
+ImageCollection ID
+MODIS/006/MYD09Q1
+sceglier quello con la quality maggiore, a parita' di qualiti scegliere quello con ref nel blu minore (vedi https://lpdaac.usgs.gov/dataset_discovery/modis/modis_products_table/mod09q1_v006)
+
+.. il blu e gli angoli li prendo dal 500 .. (product MxD09A1)
+
+problemi: 
+in gee solo dal 2016 (ma dovrebbe esserci tutto prima o poi, lo stanno caricando). 
+in piu'non ha gli angoli di vista, ma dovrebbero essere gli stessi del prodotto a 500 m 

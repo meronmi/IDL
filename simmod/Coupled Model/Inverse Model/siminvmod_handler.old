@@ -1,0 +1,147 @@
+PRO simInvMod_handler
+;Set the parameter of the model and run the model inversion
+
+;Model parameters and variables:
+;JD0, laiDOY0, SLA, eps_max, gamma, c, d, a, b, tJD, ecmwf_globrad, 
+;globrad2par, ecmwf_tair, tb, proSailVar, satObsJD, satObsRAA, satObsSZA, satObsVZA
+
+
+;##########################################################################################
+;##########################################################################################
+;USER PARAMETERS
+; doPlotSpectra, set it to 1 to plot reflectances (sim and obs) for the second obs, @ max obs NDVI, second last
+; plots are in a new window, set to 0 to suppress
+doPlotSpectra = 0
+; uppEnvFit, set it to 1 to fit the upper envelope according to the TRUE method of Chen et 2004
+; it is slower compared to normal fitting
+uppEnvFit = 1
+; weightingScheme cane be 'none' = no weigh, 'minmax' = weight based on (ndvi-min)/(max-min)
+weightingScheme = 'minmax'
+wlimOnOff = 0
+
+;SET THE TEMPORAL DOMAIN
+; start year and DOY (a period larger than any possible start and end of season)
+sYear = 2007 & sDOY = 120 ;100
+; end year and DOY
+eYear = sYear+1 & eDOY = 60; 110 
+; express them as JD
+sJD = DOY_YEAR2JD(sDOY, sYear)
+eJD = DOY_YEAR2JD(eDOY, eYear)
+PRINT, 'Temporal range (DD/MM/YYYY): ', [JD2DDMMYYYY(sJD), JD2DDMMYYYY(eJD)]
+PRINT, 'Temporal range (JD): ', LONG(sJD), LONG(eJD)
+;FIXED PARAMETERS
+globrad2par=0.48    ;conversion factor from Global radiation to PAR, (McCree, 1972 and many others)
+
+;SET FIRST guesses
+fcnargs = {SYEAR: sYear}
+fg = firstGuess_define(2, _EXTRA=fcnargs)
+;make some of the first guess available as single variable
+JD0 = fg[0]
+SLA = fg[2]
+
+;SET PARINFO
+fcnargs = {FG:fg, JD0:JD0, SJD:sJD, EJD:eJD}
+parinfo = parinfo_define(4, _EXTRA=fcnargs) 
+
+;PROSAIL PARAMETERS
+proSailVar = Set_Prosail_param(SLA)
+
+;GET DATA
+;MODIS
+modis_fn = 'X:\Active Projects\GEE\pixel extraction\profile_cleaned.csv'
+;modis_fn = 'd:\Users\meronmi\Documents\R_scripts\MODIS-FORGE\1x1SudanEddy\Lat13.2829Lon30.4783Samp1Line1.csv'
+modis_data = get_modis_profile(modis_fn)
+;ECMWF
+ecmwf_fn = 'd:\Users\meronmi\Documents\DB connection\ECMWF_Sudan_13_25-30.5_daily.csv'
+ecmwf_data = get_ecmwf_profile(ecmwf_fn)
+;EDDY data
+eddy_fn = 'S:\Actions\FOODSEC\projects\Biomass Sahel\Eddy_Data\Sudan_Demakeya\site186_CEIP_EC_L4_SD-Dem_2007-2009.csv'
+eddy_data = get_eddy_profile(eddy_fn)
+;##########################################################################################
+;##########################################################################################  
+
+;Retrieve Rsoil at 1 nm resolution from the time series 
+proSailVar.rsoil = rback_from_MODIS_TS(modis_data.R1,modis_data.R2,modis_data.R3,modis_data.R4,$
+                                       modis_data.R5,modis_data.R6,modis_data.R7, 5)
+ 
+
+
+
+
+;*******************************************************************
+;Extract relevant data to be sent to forward model)
+;ECMWF
+tJD = extract_timerange(ecmwf_data.JD, sJD, eJD, ecmwf_data.JD)
+ecmwf_globrad = extract_timerange(ecmwf_data.JD, sJD, eJD, ecmwf_data.rad)
+ecmwf_tair = extract_timerange(ecmwf_data.JD, sJD, eJD, ecmwf_data.tav)
+ecmwf_prec = extract_timerange(ecmwf_data.JD, sJD, eJD, ecmwf_data.rain)
+; test: compute memory and stress
+; as this approach considers a "memory of precipitation", and how long depends on half_life parameter,
+; I have to use some data before sJD. To be sure that I get enough, I use one year here
+DOYoffset = - 365
+tJD_bewm = extract_timerange(ecmwf_data.JD, sJD + DOYoffset, eJD, ecmwf_data.JD)
+ecmwf_tair_bewm = extract_timerange(ecmwf_data.JD, sJD + DOYoffset, eJD, ecmwf_data.tav)
+ecmwf_prec_bewm = extract_timerange(ecmwf_data.JD, sJD + DOYoffset, eJD, ecmwf_data.rain)
+; exp decay weighted average of p
+ecmwf_bewm = BackwardExpWeightedMean(tJD_bewm, ecmwf_tair_bewm, ecmwf_prec_bewm, 200.0, 100.0)
+; now extract relevant data (for the period of analysis only)
+ecmwf_bewm = extract_timerange(tJD_bewm, sJD, eJD, ecmwf_bewm)
+
+;MODIS
+satR1 = extract_timerange(modis_data.JD, sJD, eJD, modis_data.R1)
+satR2 = extract_timerange(modis_data.JD, sJD, eJD, modis_data.R2)
+satR3 = extract_timerange(modis_data.JD, sJD, eJD, modis_data.R3)
+satR4 = extract_timerange(modis_data.JD, sJD, eJD, modis_data.R4)
+satR5 = extract_timerange(modis_data.JD, sJD, eJD, modis_data.R5)
+satR6 = extract_timerange(modis_data.JD, sJD, eJD, modis_data.R6)
+satR7 = extract_timerange(modis_data.JD, sJD, eJD, modis_data.R7)
+satObsJD = extract_timerange(modis_data.JD, sJD, eJD, modis_data.JD)
+satObsRAA = extract_timerange(modis_data.JD, sJD, eJD, ABS(modis_data.RAA))
+satObsSZA = extract_timerange(modis_data.JD, sJD, eJD, modis_data.SZA)
+satObsVZA = extract_timerange(modis_data.JD, sJD, eJD, modis_data.VZA)
+
+;Eddy data
+ec_prec = extract_timerange(eddy_data.JD, sJD, eJD, eddy_data.precip)
+ec_tair = extract_timerange(eddy_data.JD, sJD, eJD,eddy_data.Ta)
+ec_JD = extract_timerange(eddy_data.JD, sJD, eJD,eddy_data.JD)
+ec_gpp_mds = extract_timerange(eddy_data.JD, sJD, eJD,eddy_data.gpp_mds)
+ec_globrad= extract_timerange(eddy_data.JD, sJD, eJD,eddy_data.radg)
+;*******************************************************************
+
+;RUN INV MODEL
+
+ret = InvWrapper(parinfo, fg, tJD, ecmwf_globrad, globrad2par, ecmwf_tair, proSailVar, $
+                 satObsJD, satObsRAA, satObsSZA, satObsVZA, $
+                 satR1, satR2, satR3, satR4, satR5, satR6, satR7, uppEnvFit, weightingScheme)
+IF (SIZE(ret, /DIMENSIONS) EQ 0) THEN BEGIN
+  PRINT, ret
+  STOP
+ENDIF
+
+;RUN FWD MODEL with fg
+;sim = simForwMod(JD0, laiDOY0, SLA, eps_max, gamma, c, d, a, b, tJD, ecmwf_globrad, globrad2par, ecmwf_tair, tb, proSailVar, satObsJD, satObsRAA, satObsSZA, satObsVZA)
+;RUN FWD MODEL with inverted parameters
+JD0=FLOOR(ret.parms[0]) & laiDOY0=ret.parms[1] & SLA=ret.parms[2] & eps_max=ret.parms[3] & gamma=ret.parms[4]
+c=ret.parms[5]  & d=ret.parms[6]       & a=ret.parms[7]   & b=ret.parms[8]  & tb=ret.parms[9]
+sim = simForwMod(JD0, laiDOY0, SLA, eps_max, gamma, c, d, a, b, tJD, ecmwf_globrad, globrad2par, ecmwf_tair, tb, proSailVar, satObsJD, satObsRAA, satObsSZA, satObsVZA)
+
+;Compute GDD of eddy data from first day of simulation 
+indFin = WHERE(FINITE(ec_JD))
+indJD0_eddy = WHERE(ec_JD[indFin] EQ JD0)
+indJD0_eddy = indFin[indJD0_eddy]
+ta_eddy = ec_tair[indJD0_eddy:*]
+ec_GDD = ec_tair[indJD0_eddy:*] * 0.0
+ec_GDD[0] = MAX([ec_tair[indJD0_eddy]-Tb, 0.0])
+FOR i = 1, N_ELEMENTS(ec_tair[indJD0_eddy:*])- 1 DO  ec_GDD[i] =  ec_GDD[i-1]+ MAX([ec_tair[indJD0_eddy+i]-Tb, 0.0])
+
+save, 'd:\Users\meronmi\Documents\IDL\simmod\tmp.sav', /ALL
+plot_inversion_results, doPlotSpectra, wlimOnOff, satR1, satR2, satR3, satR4, satR5, satR6, satR7, satObsJD, $
+                            tJD, ec_JD, INDJD0_EDDY, ecmwf_globrad, ec_globrad, $
+                            ecmwf_prec, ec_prec, sim, ec_GDD, ec_gpp_mds, ret, sYear, prosailvar
+     
+;plot_inversion_results, doPlotSpectra, satR1, satR2, satR3, satR4, satR5, satR6, satR7, satObsJD, $
+;  tJD, ec_JD, INDJD0_EDDY, ecmwf_globrad, ec_globrad, $
+;  ecmwf_prec, ec_prec, ecmwf_bewm, sim, ec_GDD, ec_gpp_mds, ret, sYear, prosailvar
+
+PRINT, 'Finished'                      
+END

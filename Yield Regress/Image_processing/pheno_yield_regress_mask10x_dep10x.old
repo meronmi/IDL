@@ -1,0 +1,203 @@
+Pro pheno_yield_regress_mask10X_dep10X
+;Use this function if you want to use crop mask and dep mask at 10X
+;as the first analysis in NIGER
+
+
+;parameters
+minpixperdept=50      ;minimum number of pixels per department
+                      ;with less for the moment the program sto
+
+
+;define path
+path='X:\Niger'
+pheno_path=path+'\VGT data\pheno_products'
+layer_path=path+'\lc_dp_layer'
+yield_path=path+'\yield_data'
+out_path=path+'\yield_reg_out'
+
+
+
+;define ancillary files
+;input
+cropmask10X_fname='LULC2000_map_100m'  ;bsq, byte
+dept_fname10X='departements_map_100m'  ;bsq, byte
+yield_fname='dep-year-yield.csv' 
+;output
+fcm_fname='fcm'                     ;bsq, float
+dept_fname='dep'                    ;bsq, byte
+report_yield_fname='report_yield.csv'
+report_production_fname='report_production.csv'
+;define image chracteristics
+;VGT data at 1000 m resolution
+ns = 1600                    ; number of samples
+nl = 900                     ; number of lines
+nb = 13                      ; number of years from 2009
+;for layers (crop mask and dept) is 10* (resampled to 100 m pixelsize)
+
+; define years for which yield stat are avialable
+n_yield_yrs=10
+yield_yrs=2000+indgen(n_yield_yrs)
+rs_yrs=1999+indgen(nb)
+rs_yr_offset=yield_yrs[0]-rs_yrs[0] ;can only be positive!!!
+; define departments 
+dept_ids=[54,55,57,58,59,60,61,62,63,64,65,66,67,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90]
+ndept=N_ELEMENTS(dept_ids)
+;pheno_products=['acc1','acc1b','acc1e','acc1eb','maxv1']
+pheno_products=['acc1','acc1b','acc1e','acc1eb','sos1_dev','len1','len1e','maxv1','maxt1_dev'];,'len1e']
+
+
+; *****************************************************************************************
+; 1 prepare the agri weighted map
+; reprocess the map only if it was delated
+IF FILE_TEST(out_path+'\'+ fcm_fname) EQ 0 THEN BEGIN
+  fcm = build_fcm(ns, nl, layer_path+'\'+cropmask10X_fname, out_path+'\'+ fcm_fname)
+ENDIF ELSE BEGIN
+  PRINT, 'fractional agri cover already present, use the existing one'
+  fcm=FLTARR(ns,nl)         ;fractional crop mask (0-1)
+  OPENR, R1, out_path+'\'+ fcm_fname, /GET_LUN  ;read the file
+  READU, R1, fcm & CLOSE, R1
+ENDELSE 
+
+; *****************************************************************************************
+; 2 extract agri-weighted pheno indicators per department
+; That is: obtain the table: Region_ID, year, weighted_avg_pheno_metric, SD_avg_pheno_metric
+
+;prepare matrix for storing RS results 
+pheno_wavg=FLTARR(ndept, n_yield_yrs)
+
+;load bsq file of departments
+; reprocess the map only if it was delated
+IF FILE_TEST(out_path+'\'+ dept_fname) EQ 0 THEN BEGIN
+  dept = build_dept(ns, nl, layer_path+'\'+dept_fname10X, out_path+'\'+ dept_fname)
+ENDIF ELSE BEGIN
+  PRINT, 'Department map already present, use the existing one'
+  dept=BYTARR(ns,nl)         ;fractional crop mask (0-1)
+  OPENR, R1, out_path+'\'+ dept_fname, /GET_LUN  ;read the file
+  READU, R1, dept & CLOSE, R1
+ENDELSE
+
+;read the yield data
+yield_data=read_yield(yield_path+'\'+yield_fname,',')
+c=0
+;OpeN reports file
+OPENW, urepy, out_path+'\'+report_yield_fname, /GET_LUN
+PRINTF, urepy, 'Pheno_product,Region,R2 Pheno Vs. Yield,b0,b1'
+
+OPENW, urepp, out_path+'\'+report_production_fname, /GET_LUN
+PRINTF, urepp, 'Pheno_product,R2 Obs_pro Vs. Mod_pro,b0,b1'
+
+FOR i=0, N_ELEMENTS(pheno_products)-1 DO BEGIN
+  ;open the pheno product (it is a bil file)
+  pheno=FLTARR(ns,nl,nb)
+  OPENR, R1, pheno_path+'\'+pheno_products[i], /GET_LUN
+  line_ass_data = ASSOC(R1, FLTARR(ns,nb))
+  FOR line=0, nl-1, 1L DO BEGIN       ; loop over all lines
+    pheno[*, line, *]=float(line_ass_data[line])
+  ENDFOR
+  CLOSE, R1
+  ;for every year compute weighted department avg and sd
+  ;store area cultivated per department
+  area=FLTARR(2,ndept) ;dept_ids, area in pixel
+  FOR y = rs_yr_offset, (rs_yr_offset + n_yield_yrs - 1) DO BEGIN
+    ;pixels for that year
+    datay=REFORM(pheno[*,*,y])
+    ;now, for each department, compute year by year the avg and sd
+    FOR d = 0, ndept-1 DO BEGIN
+      ;pixels belonging to that dept
+      ind_dep = WHERE(dept EQ dept_ids[d], count)
+      data = datay[ind_dep]
+      w = fcm[ind_dep]
+      area[0,d]=dept_ids[d]
+      area[1,d]=TOTAL(w)
+      ;pixels having finite pheno value
+      ind_finite = WHERE(FINITE(data) EQ 1, count)
+      IF count LT minpixperdept THEN BEGIN
+        STOP
+      ENDIF ELSE BEGIN
+        data = data[ind_finite]
+        w = w[ind_finite]
+        pheno_wavg[d,y-rs_yr_offset] = $
+          TOTAL(data*w)/TOTAL(w)
+        c = c + 1
+      ENDELSE 
+    ENDFOR  ;d
+  ENDFOR  ;y
+  ;reorganize pheno_wavh to be consistend with yield table
+  pheno_wavg_table=FLTARR(3, ndept*n_yield_yrs)
+  c=0
+  FOR d=0,  ndept-1 DO BEGIN
+    FOR y=0, n_yield_yrs-1 DO BEGIN
+      pheno_wavg_table[0,c]=dept_ids[d]
+      pheno_wavg_table[1,c]=yield_yrs[y]
+      pheno_wavg_table[2,c]=pheno_wavg[d,y]
+      c = c + 1
+    ENDFOR
+  ENDFOR
+  ;check consistency
+  FOR k = 0, ndept*n_yield_yrs-1 DO BEGIN
+    IF (pheno_wavg_table[0,k] NE yield_data[0,k]) $
+      OR (pheno_wavg_table[1,k] NE  yield_data[1,k]) THEN STOP
+  ENDFOR
+  
+  ;Overall analysis
+
+  WINDOW, /free
+  coeff = REGRESS(REFORM(pheno_wavg_table[2,*]), REFORM(yield_data[2,*]), CORRELATION=corr, CONST=b0)
+  ;store global coeff
+  gb0=b0
+  gb1=coeff[0]
+  PLOT, pheno_wavg_table[2,*], yield_data[2,*], XTITLE=pheno_products[i], YTITLE='Yield', $
+    TITLE='All Depts, R2=' +strtrim(corr^2,2), PSYM=1
+  OPLOT, [0, 10], gb0+gb1*[0, 10], COLOR=3000   
+  PRINT, 'Indicator '+pheno_products[i]+' completed'
+  dlmtr=','
+  PRINTF, urepy, pheno_products[i]+dlmtr+'All'+dlmtr+strtrim(corr^2, 2)+dlmtr+strtrim(b0,2)+dlmtr+strtrim(coeff[0],2)
+  ;Department level analysis
+  FOR d=0,  ndept-1 DO BEGIN
+    ;IF dept_ids[d] EQ 66 THEN STOP
+    ind=WHERE(pheno_wavg_table[0,*] eq dept_ids[d])
+    coeff = REGRESS(REFORM(pheno_wavg_table[2,ind]), REFORM(yield_data[2,ind]), CORRELATION=corr, CONST=b0)
+    PRINTF, urepy, pheno_products[i]+dlmtr+strtrim(dept_ids[d],2)+dlmtr+strtrim(corr^2, 2)+dlmtr+strtrim(b0,2)+dlmtr+strtrim(coeff[0],2)
+  ENDFOR
+
+  ;production analyis
+  obs_pro=fltarr(n_yield_yrs)
+  mod_pro=fltarr(n_yield_yrs)
+  FOR y=0, n_yield_yrs-1 DO BEGIN
+    FOR d=0,  ndept-1 DO BEGIN
+      ;sum the production of every dep
+      ;observed production
+      ;find pos of year 
+      ind=WHERE(yield_data[1,*] EQ yield_yrs[y])
+      yield_data_y=yield_data[*,ind]
+      ;find the department
+      ind=WHERE(yield_data_y[0,*] EQ dept_ids[d])
+      ;compute the production
+      inda=WHERE(area[0,*] EQ dept_ids[d])
+      ;production in Mtons (kg/ha * pix * 100 ha /1000/1000000)=Mtons
+      obs_pro[y]=obs_pro[y]+yield_data_y[2,ind]*area[1,inda]*100.0/1000000000.0
+      ;estimated production
+      ;find pos of year 
+      ind=WHERE(pheno_wavg_table[1,*] EQ yield_yrs[y])
+      pheno_wavg_table_y=pheno_wavg_table[*,ind]
+      ;find the department
+      ind=WHERE(pheno_wavg_table_y[0,*] EQ dept_ids[d])
+      mod_pro[y]=mod_pro[y]+(gb0+gb1*pheno_wavg_table_y[2,ind])*area[1,inda]*100.0/1000000000.0
+      ;**************************** DA FARE
+    ENDFOR  ;d
+  ENDFOR  ;y
+  WINDOW, /FREE
+  coeff = REGRESS(REFORM(obs_pro), REFORM(mod_pro), CORRELATION=corr, CONST=b0)
+  PLOT, yield_yrs, obs_pro, TITLE='Production, R2 = '+STRTRIM(corr^2,2)
+  OPLOT, yield_yrs, mod_pro, color=3000
+  PRINTF, urepp, pheno_products[i]+dlmtr+strtrim(corr^2, 2)+dlmtr+strtrim(b0,2)+dlmtr+strtrim(coeff[0],2)
+  WINDOW, /FREE
+  PLOT, obs_pro, mod_pro, TITLE='Production, R2 = '+STRTRIM(corr^2,2), XTITLE='obs', YTITLE='mod', psym=1
+  print, 'xx'
+ENDFOR ;i
+;close report file
+CLOSE, /ALL
+FREE_LUN, urepy
+FREE_LUN, urepp  
+PRINT, 'Processing completed'
+END

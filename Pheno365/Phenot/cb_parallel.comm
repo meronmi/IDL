@@ -1,0 +1,1 @@
+COMMON cb_parallel, n, out_path, rem_out_path, rem_idl_path, bat_fn, sav_fn, sav_path

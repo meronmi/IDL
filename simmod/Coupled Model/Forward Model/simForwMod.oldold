@@ -1,0 +1,127 @@
+PRO simForwMod_handler
+  ;Set the parameter of the model and run the model in forward mode
+  ;POTENTIALLY FREE parameter during current season simulation
+  DOY0 = 50           ;DOY at which the LAI is laiDOY0, it is used to approximate emergence of the crop
+  
+  ;POTENTIALLY FIXED or tuned on a longer time series (for example 5 years)
+  SLA=0.04            ;Specific Leaf Area(m2 g-1)
+  gamma=0.1           ;respiration coefficient (1/10), re=gamma*GPP
+  k_lb = 0.4          ;coefficient of Lambert-Beer fapar=1-exp(-k_lai*xlai)
+  laiDOY0 = 0.1       ;LAI value at DOY0, emergence
+  eps_max=2.54        ;(kgDM/GJ_PAR = gDM MJ-1) source: MARSOP3-LOTII interim report
+  ;the following have to be modelled
+  leafLifeSpanDD = 25 *30      ;lifespan in DegDays of a leaf (of the dLAI of a given day)
+  eps_s=1.0           ;normalized eps for stress
+  PRINT, simForwMod(DOY0, laiDOY0, SLA, eps_max, gamma, k_lb, leafLifeSpanDD, eps_s)
+END
+
+FUNCTION simForwMod, DOY0, laiDOY0, SLA, eps_max, gamma, k_lb, leafLifeSpanDD, eps_s
+  ;DA FARE completamante:
+  ;-eps stress
+  
+  
+  ;parameters
+  
+  nod=365         ;number of doy considered
+
+  
+   
+   
+  ;Inital observations
+  SL=300    ;season length
+  
+  
+  ;working variables
+  ; Initialize working var
+  doys=indgen(nod)
+  fa_array=fltarr(nod)*0.0              & dlai_array=fltarr(nod)*0.0    & lai_array=fltarr(nod)*0.0
+  dlai_senescent_array=fltarr(nod)*0.0  & gpp_array=fltarr(nod)*0.0     & npp_array=fltarr(nod)*0.0
+  alpha_l_array=fltarr(nod)*0.0         & alpha_r_array=fltarr(nod)*0.0 & alpha_g_array=fltarr(nod)*0.0
+  cum_dm_array=fltarr(nod)*0.0 
+  yield_array=fltarr(nod)*0.0  
+  ; Constant PAR
+  globrad=fltarr(nod)*0.0+200.0  ;(GJ ha-1 d-1)  200 maybe for Italy, 2000 for Kenya
+  globrad2par=0.48
+  par=globrad2par*globrad              ;(GJ ha-1 d-1)
+  ; Constant T
+  tempe=fltarr(nod)*0.0+30        ;(°Celsius)
+  cumTempe_dlai_array = fltarr(nod)*0.0       ;at time t, this is the cumilated temperature
+                                              ;for the leaves (dLAI) emerged in the past,
+                                              ;only if tempe > 0
+  
+  
+  ;start the computation
+  
+  lai_array[DOY0]=0.0+laiDOY0
+  cum_dm_array[DOY0]=0.0+laiDOY0/float(SLA)
+  fa_array[DOY0]=Lambert_Beer_compute_fa_from_lai(lai_array[DOY0],k_lb)  
+  
+  
+  for t=DOY0, DOY0+SL do begin
+    
+    ;compute GPP and NPP for today
+    gpp_array[t]=eps_max*eps_s*fa_array[t]*par[t]  ;(kg ha-1 d-1)
+    npp_array[t]=gpp_array[t]*(1.0-gamma)  ;(kgDM ha-1 d-1)
+
+    ;partitioning
+    fract_dev = (t-DOY0) / float(SL)
+    alpha_l_array[t] = partitioning_on_fract_cycle(fract_dev,'a')
+    alpha_g_array[t] = partitioning_on_fract_cycle(fract_dev,'g')
+    alpha_r_array[t] = 1.0 - (alpha_l_array[t] + alpha_g_array[t])
+    IF ((alpha_l_array[t] + alpha_g_array[t] + alpha_r_array[t]) GT 1.0) THEN STOP
+    
+    ;update cumulated temeperature for the emerged leaves (from DOY0 to t)
+    IF (tempe[t] GT 0) THEN BEGIN
+      ;do not update where the cum is -9999 (it has already exceeded the lifeSpan and the dLAI was already remove
+      indToUpdate = WHERE(cumTempe_dlai_array[DOY0:t] NE -9999.0, countToUpdate)
+      IF (countToUpdate GT 0) THEN cumTempe_dlai_array[DOY0+indToUpdate] = cumTempe_dlai_array[DOY0+indToUpdate] + tempe[t]  
+    ENDIF
+    ;LAI and fAPAR evolution
+    ;new lai
+    dlai_array[t]=alpha_l_array[t]*npp_array[t]/(100*100)*SLA*1000.0 ;(m2 m-2)
+    ;above ground dry matter accumulation in leaves
+    cum_dm_array[t+1]=cum_dm_array[t]+alpha_l_array[t]*npp_array[t]/(100*100)*1000 ; g m-2
+    ;senescent lai
+    ; check in which days the cumulated temperature has exceeded the lifeSpan
+    indSen = WHERE(cumTempe_dlai_array GT leafLifeSpanDD, countSen)
+    IF (countSen GT 0) THEN BEGIN
+      ;remove all this dLAI
+      dlai_senescent_array[t] = TOTAL(dlai_array[indSen])
+      ;now set to -9999 the cumulated temperature value, so that it will not be remove in the next round
+      cumTempe_dlai_array[indSen] = -9999.0 
+    END
+    ;dlai_senescent_array[t]=dlai_array[t-beta_lag]  ;old constant lag for Sen
+    ;net lai increase
+    lai_array[t+1]=lai_array[t]+ dlai_array[t]-dlai_senescent_array[t]
+    if lai_array[t+1] lt 0.0 then lai_array[t+1]=0.0
+    ;conversion of lai into fapar
+    fa_array[t+1]=Lambert_Beer_compute_fa_from_lai(lai_array[t+1], k_lb)
+    
+   
+    ;yield
+    yield_array[t]=alpha_g_array[t]*npp_array[t]    ;(kgDM ha-1 d-1)
+    
+  endfor
+  plotrange=indgen(DOY0+SL+10-(DOY0-10))+(DOY0-10)  
+  window, /FREE, XSIZE=600, YSIZE=800 
+  !P.MULTI = [0, 2, 3]
+  plot, doys[plotrange], fa_array[plotrange], YTITLE='fAPAR, LAI/20', XTITLE='DOY', BACKGROUND = 16777215, COLOR = 0, CHARSIZE=2
+  oplot, doys[plotrange], lai_array[plotrange]/20.0, color=3000
+  plot, doys[plotrange], dlai_array[plotrange], YTITLE='dLAI, LAI_senescent (m2 m-2)', XTITLE='DOY',  COLOR = 0, CHARSIZE=2
+  oplot, doys[plotrange], dlai_senescent_array[plotrange], COLOR = 3000
+  plot, doys[plotrange], gpp_array[plotrange], YTITLE='GPP, NPP (kgDM ha-1 d-1)', XTITLE='DOY',  COLOR = 0, CHARSIZE=2
+  oplot,  doys[plotrange], npp_array[plotrange], color=3000
+  ;Partitioning
+  plot, doys[plotrange], alpha_l_array[plotrange], color=0, YRANGE=[0,1.2], YTITLE='partitioning (l,r,g)', XTITLE='DOY', CHARSIZE=2, THICK = 4.0
+  oplot, doys[plotrange], alpha_r_array[plotrange], color=3000, THICK = 3.0
+  oplot, doys[plotrange], alpha_g_array[plotrange], color=30000, THICK = 2.0
+  xyouts, 0.65, 0.62, 'Leaves', /NORMAL, COLOR = 0
+  xyouts, 0.65, 0.59, 'Grains', /NORMAL, COLOR = 3000
+  xyouts, 0.65, 0.56, 'Roots', /NORMAL, COLOR = 30000
+  
+  plot, doys[plotrange], cum_dm_array[plotrange], color=0, YTITLE='Laef DM cum (g DM m-2)', XTITLE='DOY', CHARSIZE=2
+  plot, doys[plotrange], yield_array[plotrange], color=0, YTITLE='Yield (kgDM ha-1 d-1)', XTITLE='DOY', CHARSIZE=2
+  xyouts, 0.65,0.28,'Final Yiled='+strtrim(total(yield_array),2)+' kg ha-1',/NORMAL, color=0
+  print, 'finished'
+  RETURN, 0
+End

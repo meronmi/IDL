@@ -1,0 +1,31 @@
+
+Change in the calling structure. Job_handlers are not used any more. Information are given in two txt file, one setting all the IO, one setting
+the options.
+Now call regress_handler from the command line using: regress_handler, full_path_of_IO_info.txt, full_path_of_OPTIONS_info.txt
+
+
+
+New files:
+
+regress_handler.pro (for launching the regression analysis)
+predict_yield.pro (to apply the regression analysis)
+read_reg_coeff.pro (reads the regression analysis results)
+get_avg_max_fapar.pro
+extract_RS_avg_val.pro
+
+IO_info.txt
+OPTIONS_info.txt
+
+To be updated (remove the old one and replace it with this):
+yield_regress.pro
+
+
+
+
+
+
+To be removed from project:
+
+job_handler.pro
+set_io.pro
+set_ptions.pro

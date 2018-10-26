@@ -1,0 +1,148 @@
+FUNCTION phenot_p1
+
+;  Purpose:
+;     To acquire the time series to be analyzed.
+
+;  Outcome:
+;     The input data file has been read, the variables and arrays to be
+;     analyzed are initialized.
+
+;  Usage:
+;     rc = phenot_p1()
+
+;  Input parameters: None.
+
+;  Output parameters: None.
+
+;  Return values:
+;     0: Normal completion.
+;  <100: This routine returns the return code of read_xdat to the calling
+;        program.
+;  >100: Local errors.
+
+;  History:
+;     Version 1.0: This routine is an updated version of 'gs6t_p1.pro',
+;        ported to IDL 7.0 on 24 September 2008.
+;     Version 1.1: Port under Suse Linux (starting February 2010).
+
+;  Include the necessary common block(s):
+@cb_os.comm
+@cb_job.comm
+@cb_in.comm
+@cb_options.comm ;used to control vrbs and pltres
+
+;  Initialize the return code:
+retcode = 0
+
+;  Acquire the time series and ancillary data from a standard xdat file:
+rc = read_xdat(input_dir, data_fname, sensor, spat_res, site_code, $
+   site_name, cell_size, ini_year, fin_year, period, site_lat, site_lon, $
+   lat1, lat2, lon1, lon2, nlines, ncols, prod_fields, ignore_below, $
+   ignore_above, miss_code, prod_desc, date_data, julian1, julian2, products)
+
+IF (rc NE 0) THEN BEGIN
+   retcode = rc
+   PRINT, '*** phenot_p1.pro [ERROR]:'
+   PRINT, '    rc from read_xdat = ', rc
+   RETURN, retcode
+ENDIF
+
+;  Copy the first product into the fapar array, which is used in the rest of
+;  the code as the array to be analyzed. If/when multiple products become
+;  available in the same input file, it will become necessary to chose, in
+;  phase 0, which product should be analyzed. This may involve multiple
+;  products, such as when the variability is processed as part of the
+;  corresponding product. At that point, it may become necessary to manipulate
+;  the products array with a pointer to the required column, rather than the
+;  simple copy statement used here.
+fapar = products [*, 0]
+ibel = ignore_below [0]
+iabo = ignore_above [0]
+miss = miss_code [0]
+
+;  Define the arrays containing FAPAR records where some or all of the missing
+;  values have been filled-in by various methods. The initial values are the
+;  fapar array itself; missing values are replaced later in the program:
+fapar_inter_lin = fapar
+fapar_inter_qua3 = fapar
+fapar_inter_qua4 = fapar
+fapar_lomb = fapar
+fapar_pdhtf = fapar
+fapar_sigm = fapar
+
+;  Generate the array periods containing the initial Julian day number for
+;  each of the observed time periods:
+periods = INDGEN(N_ELEMENTS(julian1))
+
+;  Compute derived variables.
+;  Compute the number of years in the data set:
+numyears = fin_year - ini_year + 1
+
+;  Set the first and last years to be actually processed, taking into account
+;  the number of initial years to skip, the number of years requested to be
+;  processed, and making sure that processing is not attempted beyond the end
+;  of the data file:
+fst_year = ini_year + nskip
+lst_year = MIN([fst_year + ntot, fin_year])
+
+;  Compute the number of years to be processed:
+nyears = lst_year - fst_year + 1
+IF (nyears LT 1) THEN BEGIN
+   PRINT, '*** phenot_p1.pro [ERROR]:'
+   PRINT, '    No data to process: nyears = ', nyears
+   PRINT
+   retcode = 100
+   RETURN, retcode
+ENDIF
+
+;  Calculate npts, taking into account the number of years to skip. Currently,
+;  this is setup only for decadal and monthly data (3 or 1 point(s) per month).
+;  Handling daily data records would require also dealing with leap years, etc:
+CASE period OF
+   1: BEGIN
+         PRINT, '*** phenot_p1.pro [ERROR]:'
+         PRINT, '    Processing daily data not implemented.'
+         PRINT
+         retcode = 101
+         RETURN, retcode
+      END
+  10: BEGIN
+         npts = nyears * 36
+      END
+  30: BEGIN
+         npts = nyears * 12
+      END
+   ELSE: BEGIN
+      PRINT, '*** phenot_p1.pro [ERROR]:'
+      PRINT, '    Unrecognized periodicity in data.'
+      retcode = 140
+      RETURN, retcode
+   END
+ENDCASE
+
+;  Generate the time stamp for this run:
+tstamp = ''
+rc = timestamp(tstamp)
+
+;  Create the output subdirectory for this run in the output directory
+;  specified in the initialization file, with a name matching that of the
+;  input file, stripped of the extension:
+sdn = FILE_BASENAME(data_fname, '.xdat')
+run_dir = output_dir + sdn + "_" + tstamp + dirsep
+FILE_MKDIR, run_dir
+
+;  Optionally plot the raw FAPAR record:
+if (pltres eq 1 ) then begin
+  IF (wantplotfapar) THEN rc = phenot_plt_fapar()
+endif
+;  Report the outcome of Phase 1:
+if (vrbs eq 1) then begin
+  PRINT, '*** phenot_p1.pro [INFO]: Completed Phase 1.'
+  PRINT, '    The results from this run will be saved in '
+  PRINT, '    ' + run_dir
+  PRINT
+endif
+
+RETURN, retcode
+
+END

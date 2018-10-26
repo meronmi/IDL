@@ -1,0 +1,30 @@
+https://github.com/meronmi/IDL
+
+Sempre lanciare GIT da CMD sulla LOCAL Machine (vado in D:\IDL per il server)
+
+> git status
+mi dice cosa e'cambiato
+
+> git add --all
+gli dico di indicizzare tutte modifiche 
+
+>git commit -m "QUI SCRIVO COSA MI PAREtest with gabor"
+gli dico di aggiornare il local repository (tra virgolette un commento)
+ 
+when happy push on github server
+>git push
+
+quando voglio aggiornare la versione locale a quella di github
+>git pull
+
+
+ALTRI COMANDI
+>git log
+mi dice tutta la storia dei commits
+
+git commit -m "it commit -m "modification for arc projects"
+
+ON ANOTHER PC
+git clone https://github.com/meronmi/IDL	;clone
+git branch --all			;list branche
+git checkout -b idl --track origin/idl	;create local branche IDL, connect to remote, and witch to it

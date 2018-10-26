@@ -1,0 +1,62 @@
+FUNCTION phenot_p3_mm
+
+;  Purpose:
+;     To simulate the seasonal patterns of vegetation growth and decay
+;     with an appropriate mathematical model.
+
+;  Outcome:
+;     A mathematical model is selected on the basis of statistical
+;     results obtained previously and fitted to the FAPAR record; the
+;     model parameters and goodness of fit are recorded.
+
+;  Usage:
+;     rc = phenot_p3(gs_start, gs_stop, gs_length, gs_maxval, gs_maxtim, gs_accu)
+
+;  Input parameters: None.
+
+;  Output parameters:
+;     - gs_start: Dates of the start of growing seasons.
+;     - gs_stop: Dates of the end of growing seasons.
+;     - gs_length: Lengths of the growing seasons.
+;     - gs_maxval: Maximum value reached during the growing seasons.
+;     - gs_maxtim: Dates when the maximum values are reached.
+;     - gs_accu: Cumulative FAPAR value over the growing seasons.
+
+;  Return values:
+;     0: Normal completion.
+
+;  Remarks: None.
+
+;  History:
+;     This is an updated version of Version: 6.0, Release: 1.0, of the routine
+;     gs6t_p3.pro developed on 2007-09-20.
+
+
+;MM+
+@cb_options.comm ;used to control vrbs
+;  Initialize the return code:
+retcode = 0
+
+;  Step 1: Locate the first genuine growing season rise in the entire record:
+;rc = phenot_p3_strt()
+;MM+: suppressed, start at xoffset
+
+;;  Step 2: Identify the time period during which this initial growing
+;;  season is expected to take place:
+;; rc = gs6t_p3_inper ()
+; This step is now part of the phenot_p3_pdhtf function, as it is executed for
+; each growing season
+
+;  Step 3: Fit a Parametric Double Hyperbolic Tangent Function (PDHTF) model
+;  to the appropriate periods of the FAPAR time series, and return
+;  the model parameters for further processing:
+rc = phenot_p3_pdhtf_mm()
+
+;  Output intermediary results and optionally generate graphs:
+if (vrbs eq 1) then begin
+  rc2 = phenot_p3_out(gs_start, gs_stop, gs_length, gs_maxval, gs_maxtim, gs_accu)
+endif 
+
+RETURN, retcode
+
+END

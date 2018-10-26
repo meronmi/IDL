@@ -1,0 +1,31 @@
+FUNCTION half_life_define_all
+
+  ;RETURN, [150,10.0*30.0*(1.0+FINDGEN(10))]
+  tmp = FIX([250,800,10.0*50.0*(1.0+FINDGEN(4)), 2500, 3000, 3500, 5000, 1600, 1800, 2100, 2200])
+  tmp = tmp[SORT(tmp)]
+  RETURN, tmp
+END
+
+FUNCTION half_life_define_additional
+
+  ;RETURN, [150,10.0*30.0*(1.0+FINDGEN(10))]
+  RETURN, FIX([1600,1800,2100,2200])
+END
+FUNCTION half_life_define2
+
+  ;RETURN, [150,10.0*30.0*(1.0+FINDGEN(10))]
+  RETURN, [2500, 3000, 3500, 5000]
+END
+
+
+FUNCTION half_life_define3
+
+  ;RETURN, [150,10.0*30.0*(1.0+FINDGEN(10))]
+  RETURN, [2250, 2750]
+END
+
+FUNCTION half_life_define
+ 
+;RETURN, [150,10.0*30.0*(1.0+FINDGEN(10))]
+RETURN, [250,10.0*50.0*(1.0+FINDGEN(4))]    
+END

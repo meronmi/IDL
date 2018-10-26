@@ -1,0 +1,25 @@
+ Cab    = 35;45.0d         ;; chlorophyll content (µg.cm-2) (0-100 ug cm-2)
+ Car    = 0;0.0d;    ;; carotenoid content (µg.cm-2)  (0-25 ug cm-2)
+ Cbrown = 0.0d;     ;; brown pigment content (0-1 arbitrary units)
+ Cw     = 0.01;0.0092;   ;; EWT (cm) - Equivalent water thickness (0-0.05 cm)
+ Cm     = 0.009;0.006d;     ;; LMA (g.cm-2) - leaf mass per unit leaf area (0-0.02 g cm-2)
+ Ns     = 1.5;1.0d     ;; structure coefficient (1-3 dimensionless)
+ ;use a and be parameter instead (Michele, 4 July 2014) angl   = 57.0d    ;; average leaf angle (°)
+ ; % LIDFa LIDF parameter a, which controls the average leaf slope
+ ; % LIDFb LIDF parameter b, which controls the distribution's bimodality
+ ; % LIDF type     a      b
+ ; % Planophile    1      0
+ ; % Erectophile   -1     0
+ ; % Plagiophile   0      -1
+ ; % Extremophile  0      1
+ ; % Spherical     -0.35  -0.15
+ ; % Uniform       0      0
+ ; %   requirement: |LIDFa| + |LIDFb| <= 1
+ a = -0.35
+ b = -0.15
+ lai    = 1;5.0d     ;; leaf area index
+ hspot  = 0.01;0.05d     ;; hot spot
+ tts    = 30;65.0d    ;; solar zenith angle (°)
+ tto    = 10;0.0d     ;; observer zenith angle (°)
+ psi    = 0.0d     ;; azimuth (°)
+ psoil  = 1.0d     ;; soil coefficient

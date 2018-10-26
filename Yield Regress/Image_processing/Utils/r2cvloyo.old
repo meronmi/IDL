@@ -1,0 +1,77 @@
+FUNCTION r2cvLoyo, x, y, years
+;Purpose:
+;     To compute the cross validate leave one full year out out r2
+;  Return values:
+;     -20: Arrays contain missing data
+;     -10: Arrays have different dimensio
+;     >0:  R2cv 
+;
+n = N_ELEMENTS(x)
+
+;check that arrays have the same dimension
+IF (n NE N_ELEMENTS(y)) THEN RETURN, -10
+;check that they do not contain NaN
+ind = WHERE(FINITE(x) EQ 0, count) 
+IF (count NE 0) THEN RETURN, -20
+ind = WHERE(FINITE(y) EQ 0, count) 
+IF (count NE 0) THEN RETURN, -20
+
+yr_list = uniqlist(years)
+n_yr_2_exclude = N_ELEMENTS(yr_list)
+tmp = WHERE(years EQ years[0], n_depts) 
+yp = DBLARR(n)  ;y predicted
+;loo loop
+FOR i = 0, n_yr_2_exclude-1 DO BEGIN
+  ;year to exclude
+  yr_2_exclude = yr_list[i]
+  ;remove those
+  ind = WHERE(years NE yr_2_exclude)  ;indexes of the kept
+  indoo = WHERE(years EQ yr_2_exclude)  ;indexes of the one year out
+  xloo = x[ind]
+  yloo = y[ind]
+  b1 = REGRESS(xloo, yloo, CONST=b0, CORRELATION = corr, /DOUBLE)
+  yp[indoo] = b0 + b1[0] * x[indoo]
+ENDFOR
+
+
+SStot = TOTAL((y - MEAN(y, /DOUBLE))^2 , /DOUBLE)
+SSerrloo = TOTAL((y - yp)^2 , /DOUBLE)
+cvr2 = 1.0 - (SSerrloo/SStot)
+;overall regression
+;b1 = REGRESS(x, y, CONST=b0, CORRELATION= corr, YFIT = yfit, /DOUBLE)
+;yf = b0 + b1[0] * x
+;SSerr = TOTAL((y - yf)^2 , /DOUBLE)
+;r2 =  1.0 - (SSerr/SStot)
+RETURN, cvr2
+END
+
+;FUNCTION r2cv_dep, x_dep_year, y_dep_year
+;;Purpose:
+;;     To compute the cross validate leave one out r2 at dep level 
+;
+;nd = N_ELEMENTS(y_dep_year[*,0])
+;ny = N_ELEMENTS(y_dep_year[0,*])
+;
+;yp = DBLARR(nd, ny)       ;to store predicted loo values
+;pos = INDGEN(ny)
+;;exclude one year each time
+;FOR i = 0, ny-1 DO BEGIN
+;  ind = WHERE(pos NE i)
+;  indoo = WHERE(pos EQ i)
+;  FOR j = 0, nd-1 DO BEGIN
+;    x = x_dep_year[j,ind]
+;    y = y_dep_year[j,ind]
+;    ind_finite = ind_of_XYfinite(x, y, 0, 0, 0)
+;    x=x[ind_finite] & y=y[ind_finite] & n=N_ELEMENTS(y)
+;    b1 = REGRESS(x, y, CORRELATION=corr, CONST=b0, /DOUBLE)
+;    yp[j,indoo] = b0 + b1[0] * x_dep_year[j,indoo]
+;  ENDFOR  ;j 
+;ENDFOR  ;i
+;
+;ind = ind_of_XYfinite(x_dep_year, y_dep_year, 0, 0, 0)
+;SStot = TOTAL((y_dep_year[ind] - MEAN(y_dep_year[ind], /DOUBLE))^2 , /DOUBLE)
+;SSerrloo = TOTAL((y_dep_year[ind] - yp[ind])^2 , /DOUBLE)
+;
+;cvr2 = 1.0 - (SSerrloo/SStot)
+;RETURN, cvr2
+;END

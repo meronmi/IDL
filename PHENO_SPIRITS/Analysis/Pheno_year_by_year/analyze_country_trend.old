@@ -1,0 +1,186 @@
+PRO handlerPhen
+;analyze_country_trend, 111, 'Zambia'
+;analyze_country_trend, 156, 'Somalia'
+;analyze_country_trend, 148, 'Malawi'
+;analyze_country_trend, 20, 'Bangladesh'
+analyze_country_trend, 52, 'El_salvador'
+analyze_country_trend, 53, 'Honduras'
+analyze_country_trend, 93, 'Nicaragua'
+analyze_country_trend, 127, 'Guatemala'
+analyze_country_trend, 185, 'Ethiopia'
+analyze_country_trend, 163, 'Kenya'
+analyze_country_trend, 32, 'Mongolia'
+analyze_country_trend, 126, 'Philippines'
+analyze_country_trend, 209, 'Uganda'
+analyze_country_trend, 120, 'Morocco'
+analyze_country_trend, 121, 'Tunisia'
+analyze_country_trend, 176, 'Libya'
+analyze_country_trend, 79, 'Egypt'
+analyze_country_trend, 105, 'Algeria'
+
+END
+
+PRO analyze_country_trend, gaulId, gaulName
+;for a slected country GAUL0
+;- mask the country
+;- mask for crop and for range (one after the other)
+;and then extract
+; - the overall mean s, m, e for season 1 and 2
+; - fraction of crop (range area) that have significant Mann - Kendall tau test
+; For this latter area it extracts:
+; - mean, sd, median, interquart, min max of all trend stats (use mainstats)
+; 
+;Example
+; analyze_country_trend, 111, 'Zambia'
+
+
+threshMask = 50 ;minimum AFI value for consdering the pixel, 50 is 25 %
+
+dirsep='\'
+sep = ','
+
+;files 
+dir_ref = 'F:\Pheno_year_by_year\References' 
+fn_masks = dir_ref + dirsep + ['mask_crop_afi_masked.img', 'mask_pasture_afi_masked.img']
+name_mask = ['cropland','rangeland']
+fn_gaul = dir_ref + dirsep + 'gaul0_asap.img'
+
+var_pheno = ['s','m','e','l','ym']
+
+dir_pheno = 'F:\Pheno_year_by_year\Pheno\TIME_AVG'
+prefix_pheno = dir_pheno + dirsep + ['BBB_s_adj_','BBB_m_adj_','BBB_e_adj_','BBB_l_adj_','BBB_ym_adj_']
+
+dir_trend = 'F:\Pheno_year_by_year\Pheno\TREND_ADJ'
+prefix_trend = dir_trend + dirsep + ['BBB_s_adj_','BBB_m_adj_','BBB_e_adj_','BBB_l_adj_','BBB_ym_adj_']
+var_trend = ['OLS_gain','OLS_offset','OLS_corr','OLS_Pval','TSslope','MK_tau','MK_Pval']
+suffix_trend = ['_gain','_offset','_corr','_Pval_gain','_TSslope','MKtau','Mkp']
+
+dir_out = 'F:\Pheno_year_by_year\Pheno\TREND_ADJ\COUNTRY_ANALYSIS'
+ym_gain_offset = [0.0048, -0.2]
+
+FILE_MKDIR, (dir_out)
+OPENW, lunRep, dir_out + dirsep + gaulName + '_' + STRTRIM(gaulId,2) + '_PhenoTrend.csv', /GET_LUN
+;open gaul
+gaulImage = ReadEnviWithHdr(fn_gaul) 
+n_varPheno_varTrend_season = LONARR(N_ELEMENTS(var_pheno),N_ELEMENTS(var_trend),2)
+
+FOR k = 0, 1 DO BEGIN
+  maskImage = ReadEnviWithHdr(fn_masks[k])
+  ;PRINTF, lunRep, gaulName + sep
+  ;get the index on a 2D array to be analyzed
+  indTrgt = WHERE((gaulImage EQ gaulId) AND (maskImage GE threshMask), count)
+  countTarget = count
+  maskImage = 0
+  IF (count LT 10) THEN STOP 
+  ;PRINTF, lunRep, name_mask[k] + sep + 'n pixel' + sep + STRTRIM(count)
+  ;PRINTF, lunRep, 'Pheno for the gaul and mask'
+  ;get the fraction of bimodal pixels
+  x = ReadEnviWithHdr(prefix_pheno[0] + '1_avg')
+  ind1 = WHERE(FINITE(x[indTrgt]), count1)
+  ind1 = 0
+  x = 0
+  x = ReadEnviWithHdr(prefix_pheno[0] + '2_avg')
+  ind2 = WHERE(FINITE(x[indTrgt]), count2)
+  ind2 = 0
+  x = 0
+  fractionBi = count2/FLOAT(count1)*100
+  PRINTF, lunRep, 'GAUL'+sep+'Mask'+sep+'Sign of MKtau'+sep+'Sig%Oftarget'+sep+'Season'+sep+'Variable'+sep+'TrendInidcator'+sep+'n'+sep+$
+                  'avg'+sep+'sd'+sep+'min'+sep+'max'+sep+'median'+sep+'q1 (lower quartile)'+sep+$
+                  'q3 (upper quartile)'+sep+$
+                  'n pix target'+ sep +'Fraction of Bimodal' 
+  ;Stats of pheno
+  FOR s = 1, 2 DO BEGIN ; loop on seasons
+    ;get the pheno stats (sos, m, eos, l, ym)
+    FOR v = 0, N_ELEMENTS(var_pheno)-1 DO BEGIN
+      x = ReadEnviWithHdr(prefix_pheno[v] + STRTRIM(s,2)+'_avg')
+      IF (var_pheno[v] EQ 'ym') THEN res = mainStats(x[indTrgt], GAIN_OFFSET = ym_gain_offset) ELSE res = mainStats(x[indTrgt])
+      PRINTF, lunRep, STRJOIN([gaulName, name_mask[k], ' ', ' ', STRTRIM(s,2),var_pheno[v],'none',STRTRIM([res.n, $
+              res.avg,res.sd,res.min,res.max,res.median,res.q1, $
+              res.q3],2)], sep) + sep + STRTRIM(countTarget,2) + sep + STRTRIM(fractionBi,2)
+      x = 0
+    ENDFOR
+  ENDFOR
+  
+  
+  ;Stats of trends
+  ;PRINTF, lunRep, 'Pheno trend for the gaul and mask'
+  ;PRINTF, lunRep, 'GAUL'+sep+'Mask'+sep+'Season'+sep+'Variable'+sep+'Trend Indicator'+sep+'n'+sep+'avg'+sep+'sd'+sep+'min'+sep+'max'+sep+'median'+sep+'q1 (lower quartile)'+sep+'q3 (upper quartile)'
+  FOR s = 1, 2 DO BEGIN ; loop on seasons
+    FOR v = 0, N_ELEMENTS(var_pheno)-1 DO BEGIN
+      FOR j = 0, N_ELEMENTS(var_trend)-1 DO BEGIN
+        x = ReadEnviWithHdr(prefix_trend[v] + STRTRIM(s,2)+suffix_trend[j])
+        IF (var_pheno[v] EQ 'ym') THEN res = mainStats(x[indTrgt], GAIN_OFFSET = ym_gain_offset) ELSE res = mainStats(x[indTrgt])
+        PRINTF, lunRep, STRJOIN([gaulName, name_mask[k], ' ', ' ', STRTRIM(s,2),var_pheno[v],var_trend[j],STRTRIM([res.n,res.avg,res.sd,res.min,res.max,res.median,res.q1,res.q3],2)], sep) + sep + STRTRIM(countTarget,2) + sep + STRTRIM(fractionBi,2)
+        n_varPheno_varTrend_season[v,j,s-1] = res.n
+        x = 0
+      ENDFOR
+    ENDFOR
+  ENDFOR
+  ;Stats of trends only for those with MKp significant
+  ;PRINTF, lunRep, 'Pheno trend for the gaul and mask and MKp <0.05'
+  ;PRINTF, lunRep, 'GAUL'+sep+'Mask'+sep+'Season'+sep+'Variable'+sep+'Trend Indicator'+sep+'Mktau sign'+sep+'fractionOftarget%'+sep+'n'+sep+'avg'+sep+'sd'+sep+'min'+sep+'max'+sep+'median'+sep+'q1 (lower quartile)'+sep+'q3 (upper quartile)'
+  mktauclass = ['all','pos','neg']
+  ;open the specific mkp file
+  ;mkp = ReadEnviWithHdr(prefix_trend[v] + STRTRIM(s,2)+suffix_trend[j])
+  FOR s = 1, 2 DO BEGIN ; loop on seasons
+    FOR v = 0, N_ELEMENTS(var_pheno)-1 DO BEGIN
+      mkp = ReadEnviWithHdr(prefix_trend[v] + STRTRIM(s,2)+'Mkp')
+      ;mkp_target = mkp_target[indTrgt]          ;keep only those of target cover
+      mktau = ReadEnviWithHdr(prefix_trend[v] + STRTRIM(s,2)+'Mktau')
+      ;mktau_target = mktau_target[indTrgt]      ;keep only those of target cover
+      indTargetFinite = WHERE(FINITE(mkp[indTrgt]))
+      indTargetFinite = indTrgt[indTargetFinite]
+      indTargetFiniteSig = WHERE(mkp[indTargetFinite] LT 0.05, countTargetFiniteSig)
+      indTargetFiniteSig = indTargetFinite[indTargetFiniteSig]
+      ;IF (count GT 0) THEN ind = indTrgt[ind] ;note that ind refer to the orginal 2 image
+      mkp = 0
+      indTargetFinite = 0
+      FOR j = 0, N_ELEMENTS(var_trend)-1 DO BEGIN
+;        IF (var_trend[j] EQ 'MK_tau') THEN BEGIN
+;          PRINT, 'DEBUG'
+;        ENDIF
+        x = ReadEnviWithHdr(prefix_trend[v] + STRTRIM(s,2)+suffix_trend[j])
+        FOR c = 0, N_ELEMENTS(mktauclass)-1 DO BEGIN          
+          noSigPresent = 1
+          CASE mktauclass[c] OF
+            'all': BEGIN
+              IF (countTargetFiniteSig GT 0) THEN BEGIN
+                IF (var_pheno[v] EQ 'ym') THEN res = mainStats(x[indTargetFiniteSig], GAIN_OFFSET = ym_gain_offset) ELSE res = mainStats(x[indTargetFiniteSig])
+                noSigPresent = 0
+              ENDIF
+            END
+            'pos': BEGIN
+              indTargetFiniteSigSign = WHERE(mktau[indTargetFiniteSig] GT 0, countSign) ;pointing at target pixel only
+              indTargetFiniteSigSign = indTargetFiniteSig[indTargetFiniteSigSign] ;pointing at original image
+              IF (countSign GT 0) THEN BEGIN
+                IF (var_pheno[v] EQ 'ym') THEN res = mainStats(x[indTargetFiniteSigSign], GAIN_OFFSET = ym_gain_offset) ELSE res = mainStats(x[indTargetFiniteSigSign])
+                noSigPresent = 0
+              ENDIF
+            END 
+            'neg': BEGIN
+              indTargetFiniteSigSign = WHERE(mktau[indTargetFiniteSig] LT 0, countSign)
+              indTargetFiniteSigSign = indTargetFiniteSig[indTargetFiniteSigSign] ;pointing at original image
+              IF (countSign GT 0) THEN BEGIN
+                IF (var_pheno[v] EQ 'ym') THEN res = mainStats(x[indTargetFiniteSigSign], GAIN_OFFSET = ym_gain_offset) ELSE res = mainStats(x[indTargetFiniteSigSign])
+                noSigPresent = 0
+              ENDIF 
+            END
+          ENDCASE   
+          IF (noSigPresent EQ 0) THEN $
+            PRINTF, lunRep, STRJOIN([gaulName , name_mask[k]+' AND MKp<0.05', mktauclass[c], STRTRIM((res.n/FLOAT(n_varPheno_varTrend_season[v,j,s-1]))*100,2), STRTRIM(s,2),var_pheno[v],var_trend[j], $
+                                     STRTRIM([res.n,res.avg,res.sd,res.min,res.max,res.median,res.q1,res.q3],2), $
+                                     + sep + STRTRIM(countTarget,2) + sep + STRTRIM(fractionBi,2)], sep) $
+            ELSE PRINTF, lunRep, STRJOIN([gaulName ,name_mask[k]+' AND MKp<0.05', mktauclass[c], 0, STRTRIM(s,2),var_pheno[v],var_trend[j]], sep)+sep 
+          indSign = 0 
+        ENDFOR ;c
+        x = 0
+      ENDFOR
+    ENDFOR
+  ENDFOR
+  
+  
+  
+ENDFOR ; k loop on mask
+
+FREE_LUN, lunRep
+END

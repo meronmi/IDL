@@ -1,0 +1,22 @@
+ENVI
+description = {
+  Band Math Result, Expression =
+  [(0.37598*float(b2)-0.50132*float(b1)+0.01091)/((-0.17150-float(b1))^2+(0.29464-float(b2))^2+0.11009)]
+  B1:Band Math (float(b1)*0.25):red_0001 B2:Band Math
+  (float(b1)*0.333333):nir_0001 [Thu Feb 17 11:59:34 2011]}
+samples = 2018
+lines   = 1038
+bands   = 1
+header offset = 0
+file type = ENVI Standard
+data type = 4
+interleave = bsq
+sensor type = Unknown
+byte order = 0
+x start = 1793
+y start = 2241
+map info = {Geographic Lat/Lon, 1.0000, 1.0000, -2.00446428, 18.00446428, 8.9285714300e-003, 8.9285714300e-003, WGS-84, units=Degrees}
+coordinate system string = {GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]]}
+wavelength units = Unknown
+band names = {
+ Band Math ((0.37598*float(b2)-0.50132*float(b1)+0.01091)/((-0.17150-float(b1))^2+(0.29464-float(b2))^2+0.11009))}

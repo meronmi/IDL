@@ -1,0 +1,98 @@
+FUNCTION phenot_p3_out, gs_start, gs_stop, gs_length, gs_maxval, gs_maxtim, gs_accu
+
+;  Purpose:
+;     To report on the outcome of Phase 3 and return the main results
+;     to the calling routine.
+
+;  Outcome:
+;     The diagnostic and results output files are updated and graphs
+;     of the model fits are optionally created, both on screen
+;     and as a graphics file.
+
+;  Usage:
+;     rc = phenot_p3_out (gs_start, gs_stop, gs_length, gs_maxval, gs_maxtim, gs_accu)
+
+;  Input parameters: None.
+
+;  Output parameters:
+;     - gs_start: Dates of the start of growing seasons.
+;     - gs_stop: Dates of the end of growing seasons.
+;     - gs_length: Lengths of the growing seasons.
+;     - gs_maxval: Maximum value reached during the growing seasons.
+;     - gs_maxtim: Dates when the maximum values are reached.
+;     - gs_accu: Cumulative FAPAR value over the growing seasons.
+
+;  Return values:
+;     0: Normal completion.
+
+;  History:
+;     This is an updated version of Version: 6.0, Release: 1.0, of the routine
+;     gs6t_p3_out.pro developed on 2007-09-20.
+
+;  Include the necessary common block(s):
+@cb_os.comm
+@cb_job.comm
+@cb_frst.comm
+@cb_pdhtf.comm
+
+;  Initialize the return code:
+retcode = 0
+
+;  Save the results from the phenological analysis in a text file:
+
+;  Set the full name of the statistical output file:
+pheno_fspec = run_dir + 'pheno.txt'
+
+;  Open the output file for statistical information:
+GET_LUN, phen_unit
+OPENW, phen_unit, pheno_fspec
+
+;  Store findings in the results file:
+PRINTF, phen_unit, 'Results from the phenological analysis:'
+PRINTF, phen_unit
+
+PRINTF, phen_unit, 'Maximum number of growing seasons in the record (maxngrowseas) = ', maxngrowseas
+PRINTF, phen_unit, 'Actual number of growing seasons in the record (numgs) = ', numgs
+PRINTF, phen_unit
+PRINTF, phen_unit, 'Model parameters:'
+PRINTF, phen_unit, 'pdhtf_base = ', pdhtf_base
+PRINTF, phen_unit, 'pdhtf_amp1 = ', pdhtf_amp1
+PRINTF, phen_unit, 'pdhtf_sft1 = ', pdhtf_sft1
+PRINTF, phen_unit, 'pdhtf_slo1 = ', pdhtf_slo1
+PRINTF, phen_unit, 'pdhtf_amp2 = ', pdhtf_amp2
+PRINTF, phen_unit, 'pdhtf_sft2 = ', pdhtf_sft2
+PRINTF, phen_unit, 'pdhtf_slo2 = ', pdhtf_slo2
+PRINTF, phen_unit
+PRINTF, phen_unit, 'Inversion quality:'
+PRINTF, phen_unit, 'gsstat = ', gsstat
+PRINTF, phen_unit, 'gschis = ', gschis
+PRINTF, phen_unit
+PRINTF, phen_unit, 'Growing season characteristics:'
+PRINTF, phen_unit, 'gsstrt = ', gsstrt
+PRINTF, phen_unit, 'gsstop = ', gsstop
+PRINTF, phen_unit, 'gsleng = ', gsleng
+PRINTF, phen_unit, 'gsmaxv = ', gsmaxv
+PRINTF, phen_unit, 'gsmaxt = ', gsmaxt
+PRINTF, phen_unit, 'gsaccu = ', gsaccu
+
+CLOSE, phen_unit
+FREE_LUN, phen_unit
+
+;  Report the outcome of Phase 3:
+PRINT, '*** Completed Phase 3.'
+PRINT, ''
+
+;  Copy the results into variables that can be used as output
+;  arguments of this routine without conflicting with the common
+;  block definitions:
+; gs_dir = run_dir
+gs_start = gsstrt
+gs_stop  = gsstop
+gs_length = gsleng
+gs_maxval = gsmaxv
+gs_maxtim = gsmaxt
+gs_accu = gsaccu
+
+RETURN, retcode
+
+END

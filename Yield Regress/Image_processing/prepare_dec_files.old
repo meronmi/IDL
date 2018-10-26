@@ -1,0 +1,103 @@
+PRO dec_files_job_handler
+fname='K:\Tunisia\VGT_data\bil\Tunisia_VGTas_sc'
+out_path='K:\Tunisia\VGT_data\bil\DIR_RECOMPOSED\REALIGN'
+
+;fname='X:\Niger\VGT data\bil\NIGER_VGTaSWETS_bil_sc'
+;out_path='X:\Niger\VGT data\pheno_products\SWETS fAPAR'
+d_of_band1=10;1        ;set the decade number of the first band
+y_of_band1=1998        ;set the year of first decade
+y_of_band_out=1998;1999     ;set the year of the first band in output, can only be > y_of band1
+d_to_extract=[1,36]  ;first an last decade to extract
+
+ns=1600;494;
+nl=900;842;
+nb=477;473;442
+nbout=14  ;to be comparable with pheno products
+prepare_dec_files, fname, out_path, d_of_band1, y_of_band1, $
+                   d_to_extract, ns, nl, nb, nbout
+END
+
+;prepare_mean_file, 'X:\Niger\VGT data\bil\NIGER_VGTaSWETS_bil_sc', 'X:\Niger\VGT data\pheno_products\v2\SWETS fAPAR', 10, 1600, 900, 477
+
+
+PRO prepare_mean_file, fname, out_path, d_of_band1, $
+                       ns, nl, nb
+;this routines extract the mean annual profiles from the time series
+
+tmp=FLTARR(ns,nl,36)
+tmp[*,*,*]=!VALUES.F_NAN
+dekads=INDGEN(nb)+d_of_band1
+
+in=FLTARR(ns,nl,nb)
+OPENR, R1, fname, /GET_LUN
+line_ass_data = ASSOC(R1, FLTARR(ns,nb))
+FOR line=0, nl-1, 1L DO in[*, line, *]=float(line_ass_data[line])
+CLOSE, R1
+
+fileout=out_path+'\'+'avg_profile'
+IF FILE_TEST(fileout) eq 1 THEN FILE_DELETE, fileout
+OPENW, W1, fileout, /GET_LUN, /APPEND
+
+
+  ;with all indentified dekads, save a bil file
+  
+  FOR line=0, nl-1, 1L DO BEGIN
+    FOR d=0, 35 DO BEGIN
+    ;identify all the dekads
+      IF d EQ 36 THEN dcomp=0 ELSE dcomp=d
+      ind_d=WHERE((dekads mod 36) EQ dcomp, count_d)
+      ind_d=ind_d(SORT(ind_d)) 
+      FOR column=0, ns-1 DO BEGIN
+        tmp[column,line,d] = MEAN(in[column,line,ind_d], /NAN, /DOUBLE)
+      ENDFOR
+    ENDFOR
+  WRITEU, W1, tmp[*,line,*]
+  ENDFOR
+  FREE_LUN, W1
+END
+
+
+PRO prepare_dec_files, fname, out_path, d_of_band1, y_of_band1, y_of_band_out, $
+                   d_to_extract, ns, nl, nb, nbout
+;this routines extract from a file stack of consequent decades
+;a given decade for every year. This files can be used in regress as if they were
+;pheno products
+
+tmp=FLTARR(ns,nl,nbout)
+tmp[*,*,*]=!VALUES.F_NAN
+dekads=INDGEN(nb)+d_of_band1
+;exclude dekads befor start year
+IF (y_of_band_out-y_of_band1) GT 0 THEN BEGIN
+  n_dek_to_skip=(y_of_band_out-y_of_band1)*36-d_of_band1+1
+  dekads[0:n_dek_to_skip-1]=-999  ;do not consider it futher in the analysis
+ENDIF 
+
+in=FLTARR(ns,nl,nb)
+OPENR, R1, fname, /GET_LUN
+line_ass_data = ASSOC(R1, FLTARR(ns,nb))
+FOR line=0, nl-1, 1L DO in[*, line, *]=float(line_ass_data[line])
+CLOSE, R1
+
+
+FOR d=d_to_extract[0], d_to_extract[1] DO BEGIN
+  
+  ;identify all the dekads
+  IF d EQ 36 THEN dcomp=0 ELSE dcomp=d
+  ind_d=WHERE((dekads mod 36) EQ dcomp, count_d)
+  ind_d=ind_d(SORT(ind_d))
+  ;with all indentified dekads, save a bil file
+  fileout=out_path+'\'+'d'+strtrim(d,2)
+  IF FILE_TEST(fileout) eq 1 THEN FILE_DELETE, fileout
+  OPENW, W1, fileout, /GET_LUN, /APPEND
+  FOR line=0, nl-1, 1L DO BEGIN
+    ;for Niger, add one band (the 13th) to be comparable with pheno products
+    tmp[*,line,0:count_d-1] = in[*,line,ind_d]
+    
+    WRITEU, W1, tmp[*,line,*]
+  ENDFOR
+  FREE_LUN, W1
+  PRINT, STRTRIM(FLOOR(100*(d-d_to_extract[0])/(d_to_extract[1]-d_to_extract[0])),2) + ' % processed'
+ENDFOR
+ 
+
+END

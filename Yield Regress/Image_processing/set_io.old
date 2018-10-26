@@ -1,0 +1,27 @@
+FUNCTION set_IO
+@cb_io.comm           
+
+;define working paths
+;INPUT
+path=base_path
+pheno_path=path + rs_product_dir
+layer_path=path+'\lc_dp_layer'
+yield_path=path+'\yield_data'
+;OUTPUT
+out_path=path+'\27bis_mar\'+crop_base_name
+;CnctCerealsMask_andY2010_no_thresh
+
+
+;define absolute path for input files
+cm_fn=layer_path+'\'+AFCM_fn     
+maxFapar_fn=pheno_path+'\'+maxFapar_fn
+dept_fn=layer_path+'\'+dept_fn
+;yield_data
+yield_base_name = 'yield_' + crop_base_name
+surface_base_name = 'surface_' + crop_base_name
+yield_fn = yield_path + '\' + 'yield_' + crop_base_name + '.csv'
+surface_fn = yield_path + '\' + 'surface_' + crop_base_name + '.csv'
+
+
+RETURN, 0
+END

@@ -1,0 +1,132 @@
+COMMON cb_stat, per_nomiss, fap_nomiss, nfap_nomiss, fapmin, fap05pctl, $
+   fap25pctl, fap50pctl, fap75pctl, fap95pctl, fapmax, faprangeminthresh, $
+   ofac, hifac, freq, powr, np, ph, f, nout, jmax, prob, sig_lev_000, sig_lev_001, sig_lev_005, $
+   sig_lev_010, sig_lev_050, sig_lev_100, sig_lev_500, npwrseqs, npwrmins, $
+   npwrmaxs, pwrmins, pwrmaxs, ipwrmins, ipwrmaxs, smoothfapar, nseqs, nmin, $
+   nmax, numlags, lags, nval, meanval, varval, ncv, cov, cor, nsmooth, nseqsa, $
+   nmina, nmaxa, mins, maxs, imins, imaxs, smoothcor, nseqssma, nminsma, $
+   nmaxsma, minsma, maxsma, iminsma, imaxsma, ngspy, xoffst, n_full_solar_years, n_remaing_year, lombrat, lombRatThreshold
+;  The following variables are initially set in phenot_p2_stat:
+;     - per_nomiss {integer array}: The array containing the indices of the
+;       non-missing (valid) FAPAR values.
+;     - fap_nomiss {floating point array}: The corresponding non-missing
+;       FAPAR values.
+;     - nfap_nomiss {integer}: The number of non-missing values in the
+;       fapar array.
+;     - fapmin {floating point}: The absolute minimum fapar value
+;       within the analyzed part of the record.
+;     - fap05pctl, fap25pctl, fap50pctl, fap75pctl, fap95pctl
+;       {floating point}: The 5th, 25th, 50th, 75th, and 95th
+;       percentiles of the fapar distribution.
+;     - fapmax {floating point}: The absolute maximum fapar value
+;       within the analyzed part of the record.
+;     - faprangeminthresh {floating point}: The minimum value of the expected
+;       variability measured as the (95th - 5th) percentile difference in
+;       FAPAR. Time series with such an index of variability lower than this
+;       threshold value are considered unseasonal.
+;     - ofac {floatin point}: Oversampling factor used in the computation of
+;       the Lomb normalized periodogram (4 is a typical useful value).
+;     - hifac {floating point}: Upper frequency threshold as a multiplier of
+;       the Nyquist frequency (2 is a typical useful value).
+;     - freq {floating point array}: The set of frequencies for which the power
+;       spectrum is computed.
+;     - powr {floating point array}: The spectral power values associated with
+;       the frequencies in freq.
+;     - np {integer}: The dimension of the freq and powr arrays.
+;     - nout {integer}: The number of frequencies for which the periodogram
+;       provides information.
+;     - jmax {integer}: The index into the freq and powr arrays corresponding
+;       to the largest peak in the periodogram.
+;     - prob {floating point}: The probability that none of the peaks in the
+;       periodogram have any statistical significance. A small value implies
+;       that at least one (the largest) peak is statistically significant, in
+;       this case at the 0.001 level (set in the routine numrec_period.pro).
+;     - sig_lev_000 {floating point}: The power level required for a peak in
+;       the Lomb normalized periodogram to be significant at the 0.0001 level.
+;     - sig_lev_001 {floating point}: The power level required for a peak in
+;       the Lomb normalized periodogram to be significant at the 0.001 level.
+;     - sig_lev_005 {floating point}: The power level required for a peak in
+;       the Lomb normalized periodogram to be significant at the 0.005 level.
+;     - sig_lev_010 {floating point}: The power level required for a peak in
+;       the Lomb normalized periodogram to be significant at the 0.010 level.
+;     - sig_lev_050 {floating point}: The power level required for a peak in
+;       the Lomb normalized periodogram to be significant at the 0.050 level.
+;     - sig_lev_100 {floating point}: The power level required for a peak in
+;       the Lomb normalized periodogram to be significant at the 0.100 level.
+;     - sig_lev_500 {floating point}: The power level required for a peak in
+;       the Lomb normalized periodogram to be significant at the 0.500 level.
+;     - npwrseqs {integer}: The number of peaks in the Lomb periodogram.
+;     - npwrmins {integer}: The number of minima in the Lomb periodogram.
+;     - npwrmaxs {integer}: The number of maxima in the Lomb periodogram.
+;     - pwrmins {floating point array}: The set of minima in the Lomb
+;       periodogram.
+;     - pwrmaxs {floating point array}: The set of maxima in the Lomb
+;       periodogram.
+;     - ipwrmins {integer array}: The set of indices of the minima in the Lomb
+;       periodogram.
+;     - ipwrmaxs {integer array}: The set of indices of the maxima in the Lomb
+;       periodogram.
+;     - smoothfapar {floating point array}: A smoothed version of the
+;       fapar time series.
+;     - nseqs {integer}: Number of sequences of consecutive valid
+;       FAPAR values.
+;     - nmin {integer}: Number of local minima found in the FAPAR
+;       record.
+;     - nmax {integer}: Number of local maxima found in the FAPAR
+;       record.
+;     - numlags {integer array}: Actual number of lags for which the
+;       autocorrelograms are computed.
+;     - lags {integer array}: Array of lags actually computed.
+;     - nval {integer}: Number of valid FAPAR values in the record.
+;     - meanval {long floating point}: Arithmetic mean of the valid
+;       values in the time series.
+;     - varval {long floating point}: Variance of the valid values
+;       in the time series.
+;     - ncv {integer array}: Number of pairs of valid FAPAR values
+;       contributing to the autocovariance and autocorrelation
+;       functions at each of the lags.
+;     - cov {long floating point array}: Autocovariances at the
+;       specified lags.
+;     - cor {long floating point array}: Autocorrelations at the
+;       specified lags.
+;     - nssmooth {integer}: Number of points used in the FAPAR
+;       autocorrelogram smoothing.
+;;     - sm_cor {long floating point array}: Smoothed autocorrelogram
+;;       of the valid FAPAR values.
+;     - nseqsa {integer}: Number of sequences of consecutive valid
+;       values in the autocorrelation function for the smoothed time series.
+;     - nmina {integer}: Number of local minima found in the
+;       autocorrelation function for the smoothed time series.
+;     - nmaxa {integer}: Number of local maxima found in the
+;       autocorrelation function for the smoothed time series.
+;     - mins {floating point array}: The values of the minima found
+;       in the autocorrelation function for the smoothed time series.
+;     - maxs {floating point array}: The values of the maxima found
+;       in the autocorrelation function for the smoothed time series.
+;     - imins {integer array}: The indices of the minima found
+;       in the autocorrelation function for the smoothed time series.
+;     - imaxs {integer array}: The indices of the maxima found
+;       in the autocorrelation function for the smoothed time series.
+;     - smoothcor {floating point array}: The smoothed array of
+;       autocorrelations.
+;     - nseqssma {integer}: Number of sequences of consecutive valid
+;       values in the smoothed autocorrelation function.
+;     - nminsma {integer}: Number of local minima found in the
+;       smoothed autocorrelation function.
+;     - nmaxsma {integer}: Number of local maxima found in the
+;       smoothed autocorrelation function.
+;     - minsma {floating point array}: The values of the minima found
+;       in the smoothed autocorrelation function.
+;     - maxsma {floating point array}: The values of the maxima found
+;       in the smoothed autocorrelation function.
+;     - iminsma {integer array}: The indices of the minima found
+;       in the smoothed autocorrelation function.
+;     - imaxsma {integer array}: The indices of the maxima found
+;       in the smoothed autocorrelation function.
+;     - ngspy {integer}: Expected number of growing seasons per
+;       12-months period.
+;	  - xoffset {integer}: time series offset (the full year start at 
+;		xoffset
+;	  - n_full_solar_years {integer}:number of complete years after xoffset
+;	  - n_remaing_year {float}: fraction of remaining year 
+;	  - lombrat {float}: ratio of freq 1 to freq 2  of the lomb-scarg power spectrum

@@ -1,0 +1,8 @@
+COMMON cb_os, platform, screen, dirsep
+;  The following variables are initially set in phenot_p0:
+;     - platform {string}: The current underlying OS platform; its
+;       value is either 'Windows' or 'UNIX'.
+;     - screen {string}: The screen device; its value is 'Win' under
+;       Windows and 'X' under UNIX.
+;     - dirsep {string}: The directory separator; its value is '\'
+;       under Windows and '/' under Unix.

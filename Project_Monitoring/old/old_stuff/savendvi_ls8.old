@@ -1,0 +1,39 @@
+FUNCTION saveNDVI_LS8, in_dir, out_dir, fn_LS
+  PRINT, 'LS8, Bands 4 and 5 of the file assumed to be red and nir'
+
+  ;calibrate and save Ls7 NDVI
+  ns_LS = FIX(read_info('samples', in_dir + '\' + remove_ext_from_fn(fn_LS) + '.hdr'))
+  nl_LS = FIX(read_info('lines', in_dir + '\' + remove_ext_from_fn(fn_LS) + '.hdr'))
+  nb_LS = FIX(read_info('bands', in_dir + '\' + remove_ext_from_fn(fn_LS) + '.hdr'))
+  dt_LS = FIX(read_info('data type', in_dir + '\' + remove_ext_from_fn(fn_LS) + '.hdr'))
+  LS = MAKE_ARRAY(ns_LS, nl_LS, nb_LS, TYPE = dt_LS)
+  OPENR, lun, in_dir + '\' + fn_LS, /GET_LUN
+  READU, lun, LS
+  FREE_LUN, lun
+
+  nir = LS[*,*,4]
+  red = LS[*,*,3]
+
+  ndvi = (nir - red) / (nir + red)
+  fn_ndvi = 'TOCrefNDVI_' + remove_ext_from_fn(fn_LS)
+  OPENW, lun, out_dir + '\' + fn_ndvi + '.img', /GET_LUN
+  WRITEU, lun, ndvi
+  FREE_LUN, lun
+  map_info = read_info('map info', in_dir + '\' + remove_ext_from_fn(fn_LS) + '.hdr')
+  coord_info = read_info('coordinate system string', in_dir + '\' + remove_ext_from_fn(fn_LS) + '.hdr')
+  dt_LS = SIZE(ndvi)
+  dt_LS = dt_LS[-2]
+  OPENW, lun, out_dir + '\' + fn_ndvi + '.hdr', /GET_LUN
+  PRINTF, lun, 'ENVI'
+  PRINTF, lun, 'samples = ' + STRTRIM(ns_LS,2)
+  PRINTF, lun, 'lines = ' + STRTRIM(nl_LS,2)
+  PRINTF, lun, 'bands = 1'
+  PRINTF, lun, 'data type  = ' + STRTRIM(dt_LS,2)
+  PRINTF, lun, 'file type = ENVI Standard'
+  PRINTF, lun, 'interleave = bsq'
+  PRINTF, lun, 'byte order = 0'
+  PRINTF, lun, 'map info = ' + map_info
+  PRINTF, lun, 'coordinate system string = ' +coord_info
+  FREE_LUN, lun
+  RETURN, ndvi
+END

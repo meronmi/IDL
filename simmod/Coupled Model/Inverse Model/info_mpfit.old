@@ -1,0 +1,32 @@
+FUNCTION info_mpfit_str, status, Bestnorm, npegged, pfree_index, parms, parinfo, fg, uppEnvFit, nIter, weightingScheme
+
+info_mpfit = STRARR(4)
+info_mpfit[0] = 'Status: ' + STRTRIM(status,2) + ';  BestChi2: ' + STRTRIM(Bestnorm, 2) + $
+                '; WeightScheme = ' + weightingScheme + '; Fit to UpEnv: ' + STRTRIM(uppEnvFit, 2)
+IF (uppEnvFit EQ 1) THEN info_mpfit[0] = info_mpfit[0] + '; UpEnv iterations: ' + STRTRIM(nIter, 2)
+
+;                        DOY0;JD0         lai0        SLA         e_max        gamma          c                 d          a            b           tb
+str_format =  '("      ",A-13, "      ",   A-11, "  ",A-10, " ",  A-10,"  ",    A-10," ",      A-8, "         ",A-8, "   ",A-8, "     ",A-8, "    ",A-9)'
+par_format_fg='("fg:  ", I3,"; ",F9.1,"  ",F6.4,"  ", F6.4,"    ",F5.3,"      ",F4.2,"       ",F8.2,"    ",     F5.3,"  ", F8.2,"  ",   F7.4,"  ",  F4.2)'
+par_format_p ='("p :  ", I3,"; ",F9.1,"  ",F6.4,"  ", F6.4,"    ",F5.3,"      ",F4.2,"       ",F8.2,"    ",     F5.3,"  ", F8.2,"  ",   F7.4,"  ",  F4.2)'
+tmp = parinfo[*].PARNAME
+tmp[0] = 'DOY0; '+tmp[0]
+tmp[pfree_index] = '['+ tmp[pfree_index] + ']'
+
+;Check for free prameters pegged to limits
+IF (npegged GT 0) THEN BEGIN
+  info_mpfit[0] = info_mpfit[0] +'; N. free parameter pegged to limits ( $^L$ and $^U$ ): ' + STRTRIM(npegged,2)
+  ll = parinfo[*].LIMITS[0]
+  ul = parinfo[*].LIMITS[1]
+  ;subscripts of parameters pegged to lower limit, add the info to the string
+  ind_par_pegged_ll = WHERE((parms - parinfo[*].LIMITS[0]) EQ 0.0, count_par_pegged_ll)
+  IF (count_par_pegged_ll GT 0) THEN  tmp[ind_par_pegged_ll] = tmp[ind_par_pegged_ll] + '$^L$'
+    ind_par_pegged_ul = WHERE((parms - parinfo[*].LIMITS[1]) EQ 0.0, count_par_pegged_ul)
+  IF (count_par_pegged_ul GT 0) THEN  tmp[ind_par_pegged_ul] = tmp[ind_par_pegged_ul] + '$^U$'
+  ENDIF
+  
+info_mpfit[1] = STRING(tmp, FORMAT=str_format, /PRINT)
+info_mpfit[2] = STRING([JD2DOY(fg[0]),fg], FORMAT=par_format_fg, /PRINT)
+info_mpfit[3] = STRING([JD2DOY(parms[0]),parms], FORMAT=par_format_p, /PRINT)
+RETURN, info_mpfit
+END

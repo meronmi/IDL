@@ -1,0 +1,44 @@
+
+Hdr deve essere:
+map info = {EASE-Grid Global, 1,1, -17363604.8790229, 7307299.43225504, 2.5025e+04, 2.5025e+04, WGS-84, units=Meters}
+projection info = {99, 6371228.0, 6371228.0, 0.000000, 0.000000, 0.0, 0.0, 30.000000, EASE-Grid Global, WGS-84, User Proj Cylind Equal Area, units=Meters}
+
+
+gdalwarp -t_srs EPSG:4326 -s_srs EPSG:6933 -tr 0.00892857143 0.00892857143 -of ENVI \\ies\d5\asap\BEC_soil_moisture\dataENVIformat\sm_20100121v2.img \\ies\d5\asap\BEC_soil_moisture\dataENVIformat\sm_20100121v2latlon.img
+
+con extent modis sarebbe (da testare)
+gdalwarp -t_srs EPSG:4326 -te -180 -56.00892859 180 75 -s_srs EPSG:6933 -tr 0.00892857143 0.00892857143 -of ENVI \\ies\d5\asap\BEC_soil_moisture\dataENVIformat\sm_20100121v2.img \\ies\d5\asap\BEC_soil_moisture\dataENVIformat\sm_20100121v2latlon.img
+
+
+
+
+
+
+
+
+
+
+
+
+BUTTARE:
+
+gdalwarp -s_srs "+proj=cea +lon_0=0 +lat_ts=30 +x_0=0 +y_0=0 +datum=WGS84 +no_defs" -t_srs EPSG:4326 -of ENVI \\ies\d5\asap\BEC_soil_moisture\dataENVIformat\sm_20100121.img \\ies\d5\asap\BEC_soil_moisture\dataENVIformatsm_20100121_latlon.img
+
+gdalwarp -t_srs EPSG:4326 -of ENVI \\ies\d5\asap\BEC_soil_moisture\dataENVIformat\sm_20100121.img \\ies\d5\asap\BEC_soil_moisture\dataENVIformatsm_20100121_latlon.img
+gdalwarp -t_srs EPSG:4326 -of ENVI \\ies\d5\asap\BEC_soil_moisture\dataENVIformat\sm_20100121_testcut.tif \\ies\d5\asap\BEC_soil_moisture\dataENVIformat\sm_20100121_latlon2.img
+gdalwarp -t_srs EPSG:4326 -r average -tr 0.00892857143 0.00892857143 -of ENVI \\ies\d5\asap\BEC_soil_moisture\dataENVIformat\sm_20100121_testcut.tif \\ies\d5\asap\BEC_soil_moisture\dataENVIformat\sm_20100121_latlon5.img
+gdalwarp -t_srs EPSG:4326 -tr 0.00892857143 0.00892857143 -of ENVI \\ies\d5\asap\BEC_soil_moisture\dataENVIformat\sm_20100121_testcut.tif \\ies\d5\asap\BEC_soil_moisture\dataENVIformat\sm_20100121_latlon6.img
+
+gdaltransform -s_srs EPSG:4236 -t_srs EPSG:6933 -output_xy
+179.99 84.4397
+-17363604.8790229 7307299.43225504
+
+gdal_translate -projwin -180 85 180 -85 -projwin_srs EPSG:4326 -of GTiff //ies/d5/asap/BEC_soil_moisture/dataENVIformat/sm_20100121.img //ies/d5/asap/BEC_soil_moisture/dataENVIformat/sm_20100121_testcut.tif
+
+srcwin xoff yoff xsize ysize:
+
+gdal_translate -projwin -180 85 180 -85 -projwin_srs EPSG:4326 -of GTiff //ies/d5/asap/BEC_soil_moisture/dataENVIformat/sm_20100121.img //ies/d5/asap/BEC_soil_moisture/dataENVIformat/sm_20100121_testcut.tif
+
+
+map info = {EASE-Grid Global, 1.5000, 1.5000, -17321659.7750, 7332251.0625, 2.5067525000e+04, 2.5067525000e+04, WGS-84, units=Meters}
+projection info = {99, 6371228.0, 6371228.0, 0.000000, 0.000000, 0.0, 0.0, 30.000000, EASE-Grid Global, WGS-84, User Proj Cylind Equal Area, units=Meters}

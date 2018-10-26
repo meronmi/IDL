@@ -1,0 +1,32 @@
+<html>
+<body>
+<pre>
+<h1>Build Log</h1>
+<h3>
+--------------------Configuration: SAILVTIR - Win32 Release--------------------
+</h3>
+<h3>Command Lines</h3>
+Creating temporary file "C:\DOCUME~1\verhoef\LOCALS~1\Temp\RSP8D.tmp" with contents
+[
+/compile_only /include:"Release/" /nologo /warn:nofileopt /module:"Release/" /object:"Release/" 
+"C:\Wout_D\Projects\Eigen werk\SAIL thermisch\SAILVTIR\volscatt.for"
+"C:\Wout_D\Projects\Eigen werk\SAIL thermisch\SAILVTIR\SAILVTIR.for"
+"C:\Wout_D\Projects\Eigen werk\SAIL thermisch\SAILVTIR\FourSAIL.f"
+"C:\Wout_D\Projects\Eigen werk\SAIL thermisch\SAILVTIR\dladgen.f"
+]
+Creating command line "link.exe kernel32.lib /nologo /subsystem:console /incremental:no /pdb:"Release/SAILVTIR.pdb" /machine:I386 /out:"Release/SAILVTIR.exe"  ".\Release\dladgen.obj" ".\Release\FourSAIL.obj" ".\Release\SAILVTIR.obj" ".\Release\volscatt.obj" "
+<h3>Output Window</h3>
+Compiling Fortran...
+C:\Wout_D\Projects\Eigen werk\SAIL thermisch\SAILVTIR\volscatt.for
+C:\Wout_D\Projects\Eigen werk\SAIL thermisch\SAILVTIR\SAILVTIR.for
+C:\Wout_D\Projects\Eigen werk\SAIL thermisch\SAILVTIR\FourSAIL.f
+C:\Wout_D\Projects\Eigen werk\SAIL thermisch\SAILVTIR\dladgen.f
+Linking...
+
+
+
+<h3>Results</h3>
+SAILVTIR.exe - 0 error(s), 0 warning(s)
+</pre>
+</body>
+</html>

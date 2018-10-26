@@ -1,0 +1,37 @@
+PRO test_BOKU_compare_N0L0_with_N0Lf
+;1 make the difference of the deltas of N0L0 - N0Lf, for both veg (all times) and vege_active (only when they are active according to asap v2.0)
+;2 make the  Hovmöller diagram
+
+platform = !version.os_family
+;  Set the screen device and the directory separator:
+IF (platform EQ 'unix') THEN BEGIN
+  screen = 'X'
+  dirsep = '/'
+  main_dir = '/eos/jeodpp/home/users/mmeroni/data'
+ENDIF ELSE BEGIN
+  screen = 'Win'
+  dirsep = '\'
+  main_dir = '\\ies\d5\asap\TEST_BOKU_CONSOLIDATION_STAGE'
+ENDELSE
+variable = 'p'
+dir_results = main_dir+dirsep+'Results'
+N0Lf_mean_delta_veg = ReadEnviWithHdr(dir_results + dirsep + variable + 'N0Lf_mean_delta_veg.img')
+N0Lf_mean_delta_veg_active = ReadEnviWithHdr(dir_results + dirsep + variable + 'N0Lf_mean_delta_veg_active.img')
+N0L0_mean_delta_veg = ReadEnviWithHdr(dir_results + dirsep + variable + 'N0L0_mean_delta_veg.img')
+N0L0_mean_delta_veg_active = ReadEnviWithHdr(dir_results + dirsep + variable + 'N0L0_mean_delta_veg_active.img')
+
+;1 difference of MAE    
+MAEdiff_N0L0_minus_N0Lf_veg =  N0L0_mean_delta_veg - N0Lf_mean_delta_veg
+MAEdiff_N0L0_minus_N0Lf_veg_active =  N0L0_mean_delta_veg_active - N0Lf_mean_delta_veg_active
+;save it
+sz = SIZE(MAEdiff_N0L0_minus_N0Lf_veg)
+res = write_envi_img(MAEdiff_N0L0_minus_N0Lf_veg, dir_results + dirsep + variable + 'MAEdiff_N0L0_minus_N0Lf_veg')
+res = write_envi_hdr(dir_results + dirsep + variable + 'MAEdiff_N0L0_minus_N0Lf_veg.hdr', sz[1], sz[2], 4)
+res = write_envi_img(MAEdiff_N0L0_minus_N0Lf_veg_active, dir_results + dirsep + variable + 'MAEdiff_N0L0_minus_N0Lf_veg_active')
+res = write_envi_hdr(dir_results + dirsep + variable + 'MAEdiff_N0L0_minus_N0Lf_veg_active.hdr', sz[1], sz[2], 4)
+;2 Hovmöller diagram of the difference
+; here I have to take the 36 deks
+;DELVAR, N0Lf_mean_delta_veg, N0Lf_mean_delta_veg_active, N0L0_mean_delta_veg, N0L0_mean_delta_veg_active
+;DELVAR, MAEdiff_N0L0_minus_N0Lf_veg, MAEdiff_N0L0_minus_N0Lf_veg_active 
+; Perhaps not needed..
+END

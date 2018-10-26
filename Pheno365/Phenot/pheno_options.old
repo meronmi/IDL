@@ -1,0 +1,49 @@
+FUNCTION pheno_options, job
+@cb_job.comm  
+@cb_pdhtf.comm
+@cb_options.comm
+@cb_in.comm
+@cb_stat.comm
+@cb_optimization.comm
+
+
+;############### USER DEF PARAMETERS #######################
+; all moved to inpute file 
+;period = 10             ;for decadal analysis, the only possible now
+;resume_from_save=0      ;set to ne if the work was interrupted and you want to start from 
+;                        ;last line (line is saved and will be restored)
+;;upenv = 1               ;0 = Normal model fit, 1 = Upper envelope fit
+;;IMPORTANT SETTINGS
+;;missing data
+;ibel = 0.0  
+;iabo = 1.0
+;;thresholds
+;;faprangeminthresh = 0.02;0.05;0.10    ;expected minimum variability value moved to info file
+;fract_thresh=0.20   ;fraction of amplitued use to compute start and stop in pdhtf (see White et al., 2009)
+;fract_thresh2=0.99  ;fraction of amplitued use to compute the second stop in pdhtf
+
+
+;SETTINGS FORN RUN ON NDVI NIGER
+;use_ndvi=0
+;IF (use_ndvi EQ 1) THEN BEGIN
+;  PRINT, 'WARNING: NDVI SETTINGS!! ***************************'
+;  ibel = -0.5  ;FOR NDVI 
+;  fract_thresh=0.05
+;  fract_thresh2=0.99
+;ENDIF
+;plotting an info options
+;use_lomb = 1          ;use_lomb makes lomb ratio to be calculated and saved , not used for the moment
+;lombRatThreshold = 6.0  ;Above this ratio of peak1/peak2 we assume ngspy = 1, below it's ngspy = 2
+
+;vrbs=0              ;no verbose in @ cb_options.comm, suppress all print and report file
+;IF (job EQ 'image') THEN BEGIN
+;  pltres = 0             ;suppres all plots if 0
+;  wantplotlomb=0      ;suppress lomb plot
+;ENDIF ELSE BEGIN              ;it's pixel analysis
+;  pltres = 1
+;  resume_from_save = 0
+;  wantplotlomb = 1
+;  vrbs=1
+;END
+
+END

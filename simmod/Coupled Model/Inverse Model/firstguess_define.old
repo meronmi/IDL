@@ -1,0 +1,35 @@
+FUNCTION firstGuess_define, conf, SYEAR=sYear
+;Function used to keep track of the different parameterizations
+
+
+SLA = 0.025              ; 0.02, Specific Leaf Area(m2 g-1), once set we have to ensure consistency with PROSAIL simulation (see PROSAIL PARAMETERS)
+eps_max=2.25             ;(kgDM/GJ_PAR = gDM MJ-1) source: 2.54 from MARSOP3-LOTII interim report; 2.23 gC / MJ according to Sjstrom 2009 and using a convertion 1 mol PAR = (1/4.56) MJ PAR (from wiki)
+gamma=0.0                ;respiration coefficient (1/10), re=gamma*GPP
+;parameters controlling the leaf lifespan in DegDays, c acts as a base life span
+c = 1500                ;J = c + d * GDD, as in Maas, 1993)
+d = 1.0                 ;d controls the lifespan (j) a function of the degree days at emergence, e.g. if d if GT 0 it makes the leaves emerging later to live longer
+;coefficients a and b for partitioning into leaves (as in Maas, 1993), spring wheat
+;a = 0.02                ;(P1 = Max(1-a*EXP(b*GDD), 0) as in Maas, 1993)
+;b = 0.0023              ;0.002
+a = 1500                ;new partitioning hyperbolic function, period (in ggd)
+b = 1.2                 ;curvature
+tb = 0              ;base temperature to comput degree days (dDD = MAX(Tair-Tb, 0)
+
+CASE conf OF
+  1: BEGIN
+    ;DOY at which the LAI is laiDOY0, it is used to approximate emergence of the crop
+    DOY0 = 175 & JD0 = DOY_YEAR2JD(DOY0, sYear) ;176 è giusto
+    laiDOY0 = 0.02           ;LAI value at DOY0, emergence
+    SLA = 0.025
+  END
+  2: BEGIN
+    ;DOY at which the LAI is laiDOY0, it is used to approximate emergence of the crop
+    DOY0 = 175 & JD0 = DOY_YEAR2JD(DOY0, sYear) ;176 è giusto
+    laiDOY0 = 0.02           ;LAI value at DOY0, emergence
+    SLA = 0.065
+  END
+  ELSE: STOP
+ENDCASE
+PRINT, 'First Guess: ', LONG(JD0), laiDOY0, SLA, eps_max, gamma, c, d, a, b, tb 
+RETURN, DOUBLE([JD0, laiDOY0, SLA, eps_max, gamma, c, d, a, b, tb])
+END

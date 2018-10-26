@@ -1,0 +1,38 @@
+COMMON cb_frst, lmargin, rmargin, inistart, iniend, gsinistartDek, gsiniendDek,gsinistartDekJD, gsiniendDekJD, fap_val_idx, $
+   fap_val, fap_min_thresh, fmax, fmax_idx, fmin, fmin_idx, frst_rise
+;  The following variables are initially set in gs6t_p3_strt:
+;     - lmargin {integer}: Length of a time period, in the same units
+;       as 'periods', counted before 'frst_rise', to search for a
+;       minimum FAPAR value.
+;     - rmargin {integer}: Length of a time period, in the same units
+;       as 'periods', counted after 'frst_rise', to search for a
+;       minimum FAPAR value.
+;     - inistart {integer}: Start of the time period in which to
+;       search for the current growing season.
+;     - iniend {Integer}: End of the time period in which to
+;       search for the current growing season.
+;     - gsinistartDek {integer array}: Start of the time period in which to
+;       search for the growing seasons.
+;     - gsiniendDek {Integer array}: End of the time period in which to
+;       search for the growing seasons.
+;     - fap_val_idx {integer array}: Time index of valid FAPAR
+;       values in the entire record.
+;     - fap_val {floating point array}: Valid values of FAPAR (a
+;       shorter array than fapar itself, containing identical data
+;        but no missing values).
+;     - fap_min_thresh {floating point}: The minimum FAPAR value
+;       used to detect a likely start of growing season.
+;     - fmax {floating point}: Maximum FAPAR value in the initial
+;       range of dates where the next growing season is sought.
+;     - fmax_idx {integer}: Time index of the maximum FAPAR value in
+;       the initial range of dates where the next growing season is
+;       sought.
+;     - fmin {floating point}: FAPAR value of the minimum
+;       following the maximum FAPAR value in the initial range of
+;       dates where the next growing season is sought.
+;     - fmin_idx {integer}: Time index of the minimum
+;       following the maximum FAPAR value in the initial range of
+;       dates where the next growing season is sought.
+;     - frst_rise {integer}: Date of the first event in the input
+;       time series when FAPAR rises above fap_min_thresh, in the
+;       same time units used in 'periods' in cb_in.

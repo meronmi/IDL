@@ -1,0 +1,20 @@
+//Scope: retrieve the MODIS09A1 profile for a list of sites 
+var fromFT = ee.FeatureCollection('ft:1siK8gmexayS2Xxy3KkD227LMaPA0wS6jpv6uvRcL');
+print(fromFT);
+//print(fromFT.limit(1).projection())
+Map.centerObject(fromFT, 14);
+Map.addLayer(fromFT, {"color":"990000"}, 'Projects');
+Map.centerObject(fromFT, 4);
+var size = fromFT.size()
+print(size)
+
+var lta = ee.ImageCollection('MOD09A1').filterDate('2000-01-01', '2016-01-01');//.filterBounds(place.buffer(200));
+
+//var res = lta.limit(2).map(function(img) {
+var res = lta.map(function(img) {
+  return img.reduceRegions(fromFT, "first", 10.0, 'EPSG:4326')
+})
+//res = fc.flatten().map(function(g) { return g.set('system:index', f.id())})
+//Be care the print below gives error if there are many records
+//print(res.flatten())
+Export.table.toDrive(res.flatten(), 'modisRefProfiles2');

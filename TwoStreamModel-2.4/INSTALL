@@ -1,0 +1,54 @@
+NAME:
+	INSTALL
+
+PURPOSE:
+	This file provides general instructions to install the 2stream package.
+	The package is composed of 3 executables: 2stream and Simple2stream
+	are written with the C language whereas Simple2streamF demands a Fortran90
+	compiler.
+
+MECHANISM:
+	The 2stream package is a small project in the sense that it does not 
+	involve more than 20 source code files. The installation mechanism is
+	hence very simple and only uses the make executable (usually available
+	on all UNIX/Linux platform) and no other specific tools are needed.
+	The C compiler should be recent enough and should implement some of the
+	features of the so-called C99 norm (the strtof() routine in the standard
+	library, the const specifier,... ). These rather new functionalities are
+	however only needed in compiling srcC/interf.c.
+	No advanced features are used for the F90 routines and any compiler 
+	should work.
+
+CONFIGURATION:
+        Some variables can be set in the header of the makefile (e.g. the 
+	path to the compilers and their flags). Examples for Linux using gcc is
+	already included.
+
+INSTRUCTION:
+	In the package's directory, type at the command prompt:
+	[:prompt:] make
+	This should create the 2stream and Simple2stream C executables in the bin
+	directory, ready to be used.
+	If you are interested in the Fortran executable:
+	[:prompt:] make Fexec
+	This should create the Simple2streamF Fortran90 executable in the bin directory.
+	
+	To test the installation step went smoothly, you can execute the
+	executable with defaults parameters:
+	[:prompt:] ./bin/2stream
+	[:prompt:] ./bin/Simple2stream
+	[:prompt:] ./bin/Simple2streamF
+
+TROUBLE-SHOOTING:
+	1) If necessary, the compiler flags should include those to specify that
+	   the C source codes should be compiled with the C99 extensions of
+	   the language. For example, with the Gnu Compiler Collection, the 
+	   --std=c99 should be on the command line for compiling interf.c
+	2) As for the Fortran routines, they use the free-form format of f90. Some
+	   compilers need a specific flag to use this free format.
+
+HELPING US:
+	The installation procedure is known to be one of the weakest part of the 2stream 
+	package. Please do not hesitate to contact us with ideas or solutions
+	to problems you encountered in building this package so that we can enhance
+	future versions.

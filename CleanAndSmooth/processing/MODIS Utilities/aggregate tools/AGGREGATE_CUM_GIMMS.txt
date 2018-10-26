@@ -1,0 +1,4 @@
+Hi Michele,
+OK, I'll consider that option, although I like to avoid enormous files ;-). However that would imply some reprogramming perhaps. I have just finalized a program for aggregation (for GIMMS specific, although should be adaptable to others). For SPOT/MODIS this program can be simplified because we do just assign each pixel to one admin-layer. For now I have made a raster-Division file (10x higher resolution) in GIMMS geometry using the current shapefile, but should be updated when the new file comes in. I attach you the program and an example of the output it generates. If I manage to write something quickly for z-scoring based on the CSV-file (there indeed it is annoying perhaps to have both seasons in one, but not a big problem), I might send it to Apurba to see if he likes the output like this. 
+Cheers!
+Anton

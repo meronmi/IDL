@@ -1,0 +1,5 @@
+COMMON cb_sail_last_parameters,llai,lhspot,ltts,ltto,lpsi,lresh,lresv,labsh,labsa
+
+;Variables used to store tha SAIL parameters  and output  
+;used in the most recent run.
+;This is done to avoid calling the model again and again without changing the parameters 
