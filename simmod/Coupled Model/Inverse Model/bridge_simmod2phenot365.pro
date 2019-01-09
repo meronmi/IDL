@@ -100,8 +100,8 @@ FUNCTION bridge_SimMod2Phenot365, modis_data, force_mono
   ;ndvi_dek = INTERPOL(ndvi, modis_data.JD[indFin], jd, /NAN)
   IF (pltres) THEN BEGIN
     dummy = LABEL_DATE(DATE_FORMAT=['%D/%N','%Y'])
-    h = PLOT(modis_data.JD[indFin], ndvi, SYMBOL = 1, LINESTYLE=' ', AXIS_STYLE = 1, XTICKFORMAT='(C(CDI,1x,CMoA,1x,CYI2))')
-    h = PLOT(jd, ndvi_dek, color = 'red', SYMBOL = 1, LINESTYLE=' ',OVERPLOT=1)
+    h = PLOT(modis_data.JD[indFin], ndvi, SYMBOL = 1, LINESTYLE='', AXIS_STYLE = 1, XTICKFORMAT='(C(CDI,1x,CMoA,1x,CYI2))')
+    h = PLOT(jd, ndvi_dek, color = 'red', SYMBOL = 1, LINESTYLE='-',OVERPLOT=1)
   ENDIF
   ;now copy from pheno_handler
   ;julian1_f=float(floor(JULDAY(fst_month, fst_day, first_year, 13, 0, 0))) ;first dekad is 9810

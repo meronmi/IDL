@@ -10,7 +10,8 @@ pro DensityAndFit_log_scale, data01, data02, x_label, y_label, dir_output, data1
   RANGEOUT = rangeout, $; used with simple graph, store the used range for z, 2 elements vector
   SAVECSV = savecsv, $ ;1 to save a csv with data
   TOTALN = totaln, $ ;total number of obs to be used in the csv (made for area and pheno)
-  WEIGHT = weight ;1D array of the same dimension as data1 and data2 which holds the weighted values associated with each V1 and V2 element.
+  WEIGHT = weight, $;1D array of the same dimension as data1 and data2 which holds the weighted values associated with each V1 and V2 element.
+  FULL_FILENAME_IMPOSED = fn_imposed
 
 
   ;make a copy of input
@@ -51,7 +52,7 @@ pro DensityAndFit_log_scale, data01, data02, x_label, y_label, dir_output, data1
   ;frec_min= 0                ; only represents the values with a frequency > frec_min
   IF (N_ELEMENTS(filesuffix) GT 0) THEN  fpng=dir_output + dirsep + x_label+'VS'+ y_label + filesuffix + '_scatter.png' ELSE $
     fpng=dir_output + dirsep + x_label+'_VS_'+ y_label + '_scatter.png'
-
+  IF (N_ELEMENTS(fn_imposed) GT 0) THEN fpng = dir_output + dirsep + fn_imposed + '.png'
 
 
   ;************2. Calculation of the histogram ****************************************************************************************************
@@ -59,6 +60,7 @@ pro DensityAndFit_log_scale, data01, data02, x_label, y_label, dir_output, data1
   IF ~(KEYWORD_SET(weight)) THEN weight = FLTARR(N_ELEMENTS(data1))*0.0 + 1
   ;make sure that data do not contain NAN (this not treated by regress)
   indFin = WHERE((FINITE(data1) AND FINITE(data2)), countFin)
+  n = countFin
   IF (countFin NE N_ELEMENTS(data1)) THEN BEGIN
     data1 = data1[indfin]
     data2 = data2[indfin]
@@ -134,7 +136,7 @@ pro DensityAndFit_log_scale, data01, data02, x_label, y_label, dir_output, data1
 
 
   cvalue = (FINDGEN(nlevels)+1)*(MAX(hist) - MIN(HIST,/NAN)) / FLOAT(nlevels)  + MIN(HIST,/NAN)
-  IF (N_ELEMENTS(rgbtab) EQ 0) THEN rgbtab = 72 ;default color table
+  IF (N_ELEMENTS(rgbtab) EQ 0) THEN rgbtab = COLORTABLE(72, /REVERSE)  ;default color table
   tmp = ''
   IF (N_ELEMENTS(title) GT 0) THEN tmp = title
   IF KEYWORD_SET(nowin) THEN buf = 1 ELSE buf = 0
@@ -200,19 +202,21 @@ pro DensityAndFit_log_scale, data01, data02, x_label, y_label, dir_output, data1
     ;plot vertical and orizontal origin
     IF (data1_range[0] NE 0.0) THEN ghORY =  PLOT([0,0], xx, LINESTYLE=':', COLOR='black', OVERPLOT=1)
     IF (data2_range[0] NE 0.0) THEN ghORY =  PLOT(xx, [0,0], LINESTYLE=':', COLOR='black', OVERPLOT=1)
-    ghLeg = LEGEND(TARGET=legendTargets, POSITION=[0.1,1.0], HORIZONTAL_ALIGNMENT=0.5, SHADOW=0, THICK=0, TRANSPARENCY=100)
+    ghLeg = LEGEND(TARGET=legendTargets, POSITION=[0.8,1.0], HORIZONTAL_ALIGNMENT=0.5, SHADOW=0, THICK=0, TRANSPARENCY=100)
 
     ;GMRFajuste='GMRF y='+Gslopechar+'x'+suma+Gconstchar
     ;***************************6. Calculation RMS ********************************************************************************************************
     ;******************************************************************************************************************************************************
     ;rms=sqrt(total(double(data1(wh)-data2(wh))^2/N_elements(data1(wh))))
-    rms=sqrt(total(double(data1-data2)^2/N_elements(data1)))
-    hT1 = TEXT(0.25,0.96,'OLS $R^{2}$='+STRING(corr^2, FORMAT='(f6.4)') + ', r='+STRING(corr, FORMAT='(f7.4)')+', P = ' +STRING(p, FORMAT='(f6.4)'), TARGET=ghc, FONT_SIZE=10)
-      ;hT2 = TEXT(0.6,0.94,'RMSE='+STRTRIM(STRING(rms^2, FORMAT='(f10.5)'),2), TARGET=ghc, FONT_SIZE=10)
-      hT3 = TEXT(0.25,0.93,'OLS gain, offset='+STRING(slope, FORMAT='(f8.4)')+', '+STRTRIM(STRING(const, FORMAT='(f10.5)'),2), TARGET=ghc, FONT_SIZE=10)
+    rmse=sqrt(total(double(data2-data1)^2/N_elements(data1)))
+    mbe = total(double(data2-data1))/N_elements(data1)
+    hT1 = TEXT(0.25,0.97,'OLS $R^{2}$='+STRING(corr^2, FORMAT='(f4.2)') + ', r='+STRING(corr, FORMAT='(f4.2)')+', P=' +STRING(p, FORMAT='(f6.3)'), TARGET=ghc, FONT_SIZE=9)
+    hT2 = TEXT(0.25,0.945,'OLS gain, offset='+STRTRIM(STRING(slope, FORMAT='(f8.2)'),2)+', '+STRTRIM(STRING(const, FORMAT='(f10.2)'),2), TARGET=ghc, FONT_SIZE=9)
+    hT3 = TEXT(0.25,0.92,'RMSE='+STRTRIM(STRING(rmse, FORMAT='(f10.2)'),2) + ', MBE='+STRTRIM(STRING(mbe, FORMAT='(f10.2)'),2), TARGET=ghc, FONT_SIZE=9)
+    hT3 = TEXT(0.25,0.895,'n='+STRTRIM(STRING(n),2), TARGET=ghc, FONT_SIZE=9)
     IF (KEYWORD_SET(logfit) GT 0) THEN BEGIN
       hT4 = TEXT(0.65,0.96,'LN $R^{2}$ ='+STRING(corrln^2, FORMAT='(f6.4)'), TARGET=ghc, FONT_SIZE=10)
-        hT5 = TEXT(0.65,0.93,'LN gain, offset='+STRING(slopeln, FORMAT='(f6.4)')+','+STRTRIM(STRING(constln, FORMAT='(f10.5)'),2), TARGET=ghc, FONT_SIZE=10)
+      hT5 = TEXT(0.65,0.93,'LN gain, offset='+STRING(slopeln, FORMAT='(f6.4)')+','+STRTRIM(STRING(constln, FORMAT='(f10.5)'),2), TARGET=ghc, FONT_SIZE=10)
     ENDIF
   ENDIF ;KEYWORD_SET
 

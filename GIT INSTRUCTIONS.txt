@@ -27,4 +27,4 @@ git commit -m "it commit -m "modification for arc projects"
 ON ANOTHER PC
 git clone https://github.com/meronmi/IDL	;clone
 git branch --all			;list branche
-git checkout -b idl --track origin/idl	;create local branche IDL, connect to remote, and witch to it
+git checkout -b idl --track origin/idl	;create local branche IDL, connect to remote, and switch to it

@@ -1,5 +1,5 @@
 PRO plot_handler
-  dir = '\\ies\d5\asap\TEST_BOKU_CONSOLIDATION_STAGE\3tiles\H22V08ENVI'
+  dir = '\\ies\d5\asap\users_data\meronmi\TEST_BOKU_CONSOLIDATION_STAGE\3tiles\H22V08ENVI';'\\ies\d5\asap\TEST_BOKU_CONSOLIDATION_STAGE\3tiles\H22V08ENVI'
   pos = [460, 821] ;crop in somalia
 
   year1 = 2010
@@ -51,7 +51,7 @@ FUNCTION plot_profiles, dir, x, y, xrng, useSave
     RESTORE, FILENAME = dir + '\' + 'plotsave' + STRTRIM(x,2) + '_' + STRTRIM(y,2) + '.sav'
   ENDELSE
 
-
+  ;other plot for presentation (smoothing vs filtering), done in a separate pro
 
   ;check that they have equal size
   IF ((N_ELEMENTS(REFORM(oX[0,*])) NE N_ELEMENTS(uf)) OR (N_ELEMENTS(uf) NE N_ELEMENTS(uc))) THEN STOP

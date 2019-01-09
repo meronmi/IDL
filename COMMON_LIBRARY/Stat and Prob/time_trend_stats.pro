@@ -13,10 +13,10 @@ Function time_trend_stats, fnameY, inPath, outPath, outBaseName, validRange,  YS
 ;     print, trendY ('A1sos-1997_acc1', 'Q:\WA\all sahel\data\DIR_RECOMPOSED_UppEnv\REALIGN_ON_sos\ANOMALIES\Correlation_analysis', 7841, 1458, 16, 'Q:\WA\all sahel\data\DIR_RECOMPOSED_UppEnv\REALIGN_ON_sos\ANOMALIES\Correlation_analysis\Trends', 'acc1trend999is0', 0)
 
 ;  Input parameters: None.
-;     fnameX: input bil file for X 
+;     fnameY: input bil file for Y 
 ;     inPath: path for input files
 ;     outPath: outputh path
-;     outBaseName: output basename (e.g., 'SosDltVsAcc')
+;     outBaseName: output basename (e.g., 'SosDltVsTime')
 ;     validRange:  [x1, y1] valid range (above or below is set to nan, e.g. [0,250]
 ;     YSCALING, [offset, gain] to be applied to y
 

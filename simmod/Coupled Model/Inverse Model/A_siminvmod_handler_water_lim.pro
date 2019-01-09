@@ -4,10 +4,10 @@ PRO runHandler
   
   ;ini_list = 'F:\SimMod_data\newRUN1_4sites_eps' + STRTRIM(INDGEN(16)+10,2) + '.txt'
   ;ini_list = ['D:\SimMod_data\newRUN1_Validation_sites.txt']
-  ini_list = ['D:\SimMod_data\newRUN1_Validation_sites_exclude_avi.txt']
+  ini_list = ['D:\SimMod_data\newRUN1_Validation_sites_exclude_avi_new_graphs2.txt'] ;'D:\SimMod_data\test.txt']
   ;remove and run on all when stable
   ;ini_list = ['D:\SimMod_data\RUN6_250.txt']
-  clumping = [1.0, 0.78] ;[1.0];
+  clumping = [1.0];, 0.78] ;[1.0];
 
   FOR i = 0, N_ELEMENTS(ini_list)-1 DO BEGIN
     FOR j = 0, N_ELEMENTS(clumping)-1 DO BEGIN
@@ -173,6 +173,10 @@ FUNCTION A_simInvMod_handler_water_lim, ini_fn, clumping
       ;pheno = CREATE_STRUCT('ngspy', 2, 'lombrat', 0.0, 'avg_sos', [1.0,220.0], 'sd_sos', [20.0,20],'avg_eos', [210.0,350], 'sd_eos', [20.0,20],'avg_tom', [140.0,290], 'sd_tom', [20,20], 'log_text', 'pheno imposed')
       pheno = CREATE_STRUCT('ngspy', 2, 'lombrat', 0.0, 'avg_sos', [330,180.0], 'sd_sos', [30.0,30],'avg_eos', [180.0,330], 'sd_eos', [40.0,30],'avg_tom', [130.0,280], 'sd_tom', [30,30], 'log_text', 'pheno imposed')
     ENDIF
+    IF (site_info.site_code[t]) EQ 'IT-Ro4' THEN BEGIN
+      ;pheno = CREATE_STRUCT('ngspy', 2, 'lombrat', 0.0, 'avg_sos', [1.0,220.0], 'sd_sos', [20.0,20],'avg_eos', [210.0,350], 'sd_eos', [20.0,20],'avg_tom', [140.0,290], 'sd_tom', [20,20], 'log_text', 'pheno imposed')
+      pheno = CREATE_STRUCT('ngspy', 1, 'lombrat',2.29017, 'avg_sos', [30,0.0], 'sd_sos', [45.0,0],'avg_eos', [225.0,0], 'sd_eos', [40.0,30],'avg_tom', [160.0,0], 'sd_tom', [30,0], 'log_text', 'pheno imposed')
+    ENDIF
     PRINTF, lunlog, pheno.log_text
     ;as we do analyze year after year s1 and s2, it is better to have s1 has rthe one occurring first during the year
     IF ((pheno.ngspy EQ 2) AND (pheno.AVG_SOS[0] GT pheno.AVG_SOS[1])) THEN BEGIN
@@ -312,6 +316,7 @@ FUNCTION A_simInvMod_handler_water_lim, ini_fn, clumping
           fg[7] = a
           ;set limits for parameter a
           mt = extract_timerange(ecmwf_data.JD, sJD, eJD, ecmwf_data.tav)
+          ;mean temperature?
           mt = computedGDD_abs(mt, Tb) / FLOAT(N_ELEMENTS(mt))
           ;mt = MEAN(extract_timerange(ecmwf_data.JD, sJD, eJD, posTav))
           ll = mt * FIX(values[3])
@@ -551,7 +556,7 @@ FUNCTION A_simInvMod_handler_water_lim, ini_fn, clumping
           ;                                    ecmwf_prec, ec_prec, sim, ec_GDD, ecmwf_GDD, ec_gpp_mds, ret, sYear, $
           ;                                    prosailvar, useEddyMet, wlim.tJD, ratio, out_dir, base_name, $
           ;                                    RefGppAvailable, RefGpp_data, globrad2par, eps_max, wlim.eps_onoff, runReportFn, ini_fn
-          seasResmplSim = plot_inversion_results3(buffer_site_year_plot, doPlotSpectra, satR1, satR2, satR3, satR4, satR5, satR6, satR7, satObsJD, $
+          seasResmplSim = plot_inversion_results3_v2(buffer_site_year_plot, doPlotSpectra, satR1, satR2, satR3, satR4, satR5, satR6, satR7, satObsJD, $
             tJD, indJD0_ecmwf, ec_JD, INDJD0_eddy, ecmwf_globrad, ec_globrad, ecmwf_tair, ec_tair, $
             ecmwf_prec, ec_prec, sim, ec_GDD, ecmwf_GDD, ec_gpp_mds, ret, sYear, $
             prosailvar, useEddyMet, wlim.tJD, ratio, out_dir, base_name, $
@@ -623,8 +628,9 @@ FUNCTION A_simInvMod_handler_water_lim, ini_fn, clumping
       siteModisNDVI = (modis_data.R2 - modis_data.R1) / (modis_data.R2 + modis_data.R1)
       NDVIobsJD = modis_data.JD
 
-      ;now some plots and than regression
-      ret = plotSiteResults(pheno.lombrat, siteEc_JD, siteSimNDVIJD, NDVIobsJD, siteEc_gpp, siteResmplSimGpp_offSeason, siteModisGpp, siteModisNDVI,  siteSimNDVI, site_info.igbp[t], site_info.site_code[t], site_run_reportFn, out_dir)
+      ;now some plots and than regression plotSiteResults_v2
+      ;ret = plotSiteResults(pheno.lombrat, siteEc_JD, siteSimNDVIJD, NDVIobsJD, siteEc_gpp, siteResmplSimGpp_offSeason, siteModisGpp, siteModisNDVI,  siteSimNDVI, site_info.igbp[t], site_info.site_code[t], site_run_reportFn, out_dir)
+      ret = plotSiteResults_v2(pheno.lombrat, siteEc_JD, siteSimNDVIJD, NDVIobsJD, siteEc_gpp, siteResmplSimGpp_offSeason, siteModisGpp, siteModisNDVI,  siteSimNDVI, site_info.igbp[t], site_info.site_code[t], site_run_reportFn, out_dir)
       ;store the data for the multi year multi site analysis
       multiSiteYearSimGpp = [multiSiteYearSimGpp, siteResmplSimGpp_offSeason]
       multiSiteYearEcGpp = [multiSiteYearEcGpp, siteEc_gpp]

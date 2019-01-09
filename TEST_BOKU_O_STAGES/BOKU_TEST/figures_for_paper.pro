@@ -36,7 +36,7 @@ prefix = 'z'
 suffix = '__2003-2016_HoA_bsq.img'
 NhfHf_computed = 0
 option = ['x'] ; ['x', 'f'], compute x only as it was shown to be better for multicat ranked agreement, if modified, data has to change to include the index for the two versions
-deks2map = [27,30,33,36]
+deks2map = [27,30,33]
 year2map = 2010
 frstyear = 2003
 ;store the deks and products here
