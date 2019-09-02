@@ -1,0 +1,65 @@
+FUNCTION findMinAwayFromMax, subExtrema, sig, indOfMaxInExtrema, inRange, y, direction
+;given the position of a max (indOfMaxInExtrema) 
+;retrieve the closest min of y, in a direction (direction) that is still in the required range (inRange0=1)
+;and it is smaller than ...
+
+;all variables except y have the number of elements of subExtrema, and the elements points to y
+
+
+yRangeFraction = (MAX(y)- MIN(y))*0.6
+yMax = MAX(y)
+subMax = WHERE(sig EQ 1)
+yExtrema = y[subExtrema]
+yExtrema[subMax] = 9999 ;set a very big value for all the maxima present
+
+IF (direction EQ 'left') THEN BEGIN
+  ySegmnet =  yExtrema[0:indOfMaxInExtrema-1]
+  inRangeSegment = inRange[0:indOfMaxInExtrema-1]
+  ;mirror it to have the same strategy
+  ySegmnet = REVERSE(ySegmnet)
+  inRangeSegment =  REVERSE(inRangeSegment)
+ENDIF ELSE BEGIN
+  ySegmnet =  yExtrema[indOfMaxInExtrema+1:-1]
+  inRangeSegment = inRange[indOfMaxInExtrema+1:-1]
+ENDELSE
+
+;in the (left or right) segment find the first for which yMax-ySegment is big (greater than yRangeFraction). 
+;If there is no big, find the smallest
+ind = -1
+indBig = WHERE(yMax-ySegmnet GT yRangeFraction, countBig)
+IF ((countBig GT 0) AND (inRangeSegment[indBig[0]] EQ 1)) THEN BEGIN ;it is big and it is within range
+  ind = indBig[0]  ;take the first 
+ENDIF ELSE BEGIN
+  ;there is no big in the range, take, among those in the range, the lowest one
+  subOfInRange = WHERE(inRangeSegment EQ 1, count)
+  IF (count GT 0) THEN BEGIN
+    ySegmentInRange = ySegmnet[subOfInRange]
+    tmp = MIN(ySegmentInRange, inLowest)
+    ind =  subOfInRange[inLowest[0]]
+  ENDIF
+ENDELSE
+
+
+IF (ind EQ -1) THEN BEGIN
+;there is no big and no min in the range, take it form outside
+  indBig = WHERE(yMax-ySegmnet GT yRangeFraction, countBig)
+  IF ((countBig GT 0)) THEN BEGIN ;it is big and it is within range
+    ind = indBig[0]  ;take the first
+  ENDIF ELSE BEGIN
+    ;there is no big in the range, take the lowest minima in the range
+    tmp = MIN(ySegmnet, inLowest)
+    ind =  inLowest[0]
+  ENDELSE
+ENDIF
+;remeber that when 'left', the array is mirrored
+IF (direction EQ 'left') THEN BEGIN
+  ;ind is sub from indOfMaxInExtrema-1 going 0
+  ind = (indOfMaxInExtrema-1)-ind
+ENDIF ELSE BEGIN
+  ind =  ind + indOfMaxInExtrema+1 
+ENDELSE
+
+
+RETURN, ind
+
+END

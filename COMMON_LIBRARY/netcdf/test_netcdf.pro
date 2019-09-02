@@ -1,6 +1,7 @@
 PRO test_netcdf
 
 fn = '\\ies\d5\asap\BEC_soil_moisture\data\D\BEC_BIN_SM_D_20100113T001244_20100114T002702_NOMINAL_025_002.nc'
+;fn = '\\ies\d5\asap\users_data\meronmi\El_NINO_ANTON\EL NINO Anton\GlobalGIMMS\netcdfFromEcoCast\'
 ncdfObj = Obj_New('NCDF_DATA', fn, /NO_READ_ON_PARSE)
 ; METHODS:
 ;

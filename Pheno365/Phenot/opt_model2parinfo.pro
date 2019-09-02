@@ -27,6 +27,8 @@ IF (upenv EQ 0) THEN BEGIN
                         fg, weights=yweights, $
                         STATUS = stat, YFIT=yfit, BESTNORM=BESTNORM, FTOL=1.D-3, $
                         parinfo = parinfo, PERROR=PERROR, ERRMSG=error, ITMAX=500, /AUTODERIVATIVE, /QUIET) 
+  IF (stat EQ 5) OR (stat EQ 0) OR (stat LT 0) THEN RETURN, 10
+ ; PRINT, 'debug'
 ENDIF ELSE BEGIN ;upenv EQ 1
   ; Fit the upper envelop
   ; Start with the first fitting
@@ -35,18 +37,18 @@ ENDIF ELSE BEGIN ;upenv EQ 1
                STATUS = stat, YFIT=yfit, BESTNORM=BESTNORM, FTOL=1.D-3, $
                parinfo = parinfo, PERROR=PERROR, ERRMSG=error, ITMAX=500, /AUTODERIVATIVE, /QUIET)
   ; If unable to fit, return code 10
-  IF (stat EQ 5) OR (stat EQ 0) THEN BEGIN
+  IF (stat EQ 5) OR (stat EQ 0) OR (stat LT 0) THEN BEGIN
     RETURN, 10
   ENDIF ELSE BEGIN
     ;store the output in last parameters
     lp = p & lyfit = yfit & lBESTNORM = BESTNORM & lPERROR=PERROR & lstat = stat
   ENDELSE
   ; weight calculation
-  dif  = ABS(y - yfit)
+  resu = y - yfit
+  dif  = ABS(resu)
   mm   = MAX(dif)
   ;debug per intercettare un Floating illegal operand
   IF (mm EQ 0) THEN STOP 
-  resu = y - yfit
   
   weights = FLTARR(N_ELEMENTS(x)) + 1.
   index = WHERE(resu LE 0)
@@ -95,9 +97,9 @@ ENDIF ELSE BEGIN ;upenv EQ 1
     it++
   ENDWHILE   
 ENDELSE ;fit the upenv
-            
-chi= TOTAL( (y-yfit)^2 * ABS(yweights) )
-DOF     = N_ELEMENTS(x) - N_ELEMENTS(p) ; deg of freedom
+;PRINT, it
+chi = TOTAL( (y-yfit)^2 * ABS(yweights) )
+DOF = N_ELEMENTS(x) - N_ELEMENTS(p) ; deg of freedom
 PCERROR = PERROR * SQRT(BESTNORM / DOF)   ; scaled uncertainties
                     
 RETURN, 0

@@ -1,0 +1,7 @@
+-       The fitting itself (using phenoMainDouble.pro) can also be done for specific time series for a pixel. However, when fitting for all pixels of an image, a BIL-stack 
+	(of NDVI or another vegetation index) needs to be prepared. The programme phenoImageWrapper_S2_pdht_Kapiti.pro then needs to be used. Note that it can take quite long to process (
+	for the ~2000x2000 pixels of Kapiti, I think that it was about 3 days for one season). Note that (for now) you need to hardcode all observation dates into the programme… (L
+-       phenoMainDouble.pro is the main fitting program, which calls upon a number of other programs (including mpfit and mpfitfun for the real fitting, and opt_model2parinfo.pro for the fitting iteration 
+	to give more weight to larger NDVI values)
+-       the other programs are probably also needed (definition of the model to fit in tanh_Double.pro, finding initial parameters for the model (tanhDouble_findStart.pro), 
+	dateString manipulation in file names with “Julian, and some others)

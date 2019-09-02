@@ -23,7 +23,7 @@ PRO SPIRITS_from_108_to_36
     READU, lun, data
     FREE_LUN, lun
     IF (dt EQ 1) THEN BEGIN
-      matOut = BYTE(data) * 0B + 254B
+      matOut = BYTE(data) * 0B ;+ 254B
     ENDIF ELSE BEGIN
       matOut = FLTARR(ns,nl) -9999
       indNaN = WHERE(~FINITE(data), countNaN)

@@ -4,7 +4,8 @@ PRO runHandler
   
   ;ini_list = 'F:\SimMod_data\newRUN1_4sites_eps' + STRTRIM(INDGEN(16)+10,2) + '.txt'
   ;ini_list = ['D:\SimMod_data\newRUN1_Validation_sites.txt']
-  ini_list = ['D:\SimMod_data\newRUN1_Validation_sites_exclude_avi_new_graphs2.txt'] ;'D:\SimMod_data\test.txt']
+  ini_list = ['D:\SimMod_data\newRUN1_Validation_sites_exclude_avi_new_graphs5.txt'];['D:\SimMod_data\newRUN1_Validation_sites_exclude_avi_new_graphs2.txt'] ;'D:\SimMod_data\test.txt']
+ 
   ;remove and run on all when stable
   ;ini_list = ['D:\SimMod_data\RUN6_250.txt']
   clumping = [1.0];, 0.78] ;[1.0];
@@ -21,7 +22,8 @@ FUNCTION A_simInvMod_handler_water_lim, ini_fn, clumping
 
   buffer_site_year_plot = 1 ;with 1 no pop up windows, with 0 yes
   force_mono = 0 ;TEST FOR CROPS
-
+  site_lat_crop_type = define_site_lat_crop_type() ;this contains all the site, the lon lat and for crop, the crop type
+  
   MPFIT_RESET_RECURSION
 
   ; Initialized required common blocks
@@ -78,9 +80,13 @@ FUNCTION A_simInvMod_handler_water_lim, ini_fn, clumping
   runReportFn =  out_dir + '\AAA_report_' + FILE_BASENAME(ini_fn,'.txt') + '.csv'
   site_run_reportFn = out_dir + '\AAA_site_report_' + FILE_BASENAME(ini_fn,'.txt') + '.csv'
   overall_run_reportFn =  out_dir + '\AAA_overall_report_' + FILE_BASENAME(ini_fn,'.txt') + '.csv'
+  site_yearGPP_report = out_dir + '\AAA_site_yearGPP_report_' + FILE_BASENAME(ini_fn,'.txt') + '.csv'
+  site_meanSiteYearlyGPP_report = out_dir + '\AAA_site_meanSiteYearlyGPP_report_' + FILE_BASENAME(ini_fn,'.txt') + '.csv'
   IF (FILE_SEARCH(runReportFn) NE '') THEN FILE_DELETE, runReportFn
   IF (FILE_SEARCH(site_run_reportFn) NE '') THEN FILE_DELETE, site_run_reportFn
   IF (FILE_SEARCH(overall_run_reportFn) NE '') THEN FILE_DELETE, overall_run_reportFn
+  IF (FILE_SEARCH(site_yearGPP_report) NE '') THEN FILE_DELETE, site_yearGPP_report
+  IF (FILE_SEARCH(site_meanSiteYearlyGPP_report) NE '') THEN FILE_DELETE, site_meanSiteYearlyGPP_report
   ; doPlotSpectra, set it to 1 to plot reflectances (sim and obs) for the second obs, @ max obs NDVI, second last
   doPlotSpectra = FIX(read_info('doPlotSpectra', ini_fn))
 
@@ -124,7 +130,20 @@ FUNCTION A_simInvMod_handler_water_lim, ini_fn, clumping
   multiSiteYearSiteCode = [!NULL]
   multiSiteYearSiteId = [!NULL]
   multiSiteYearSiteIGBP = [!NULL]
-
+  ;and variable to store interannualk variability
+  EC_yearly_GPP = !NULL
+  Sim_yearly_GPP = !NULL
+  MOD_yearly_GPP = !NULL
+  IGBP_yearly_GPP = !NULL
+  lat_yearly_GPP = !NULL
+  lon_yearly_GPP = !NULL
+  crop_type_yearly_GPP = !NULL
+  site_code_yearly_GPP = !NULL
+  yyyy_yearly_GPP = !NULL
+  n8day_yearly_GPP = !NULL
+  skippedBecauseNoModis = 0
+  nYears_complete = 0
+  nYears_incomplete = 0
 
 
   FOR t = 0, N_ELEMENTS(site_info.Site_code)-1 DO BEGIN
@@ -172,6 +191,7 @@ FUNCTION A_simInvMod_handler_water_lim, ini_fn, clumping
     IF (site_info.site_code[t]) EQ 'FR-Lam' THEN BEGIN
       ;pheno = CREATE_STRUCT('ngspy', 2, 'lombrat', 0.0, 'avg_sos', [1.0,220.0], 'sd_sos', [20.0,20],'avg_eos', [210.0,350], 'sd_eos', [20.0,20],'avg_tom', [140.0,290], 'sd_tom', [20,20], 'log_text', 'pheno imposed')
       pheno = CREATE_STRUCT('ngspy', 2, 'lombrat', 0.0, 'avg_sos', [330,180.0], 'sd_sos', [30.0,30],'avg_eos', [180.0,330], 'sd_eos', [40.0,30],'avg_tom', [130.0,280], 'sd_tom', [30,30], 'log_text', 'pheno imposed')
+      pheno = CREATE_STRUCT('ngspy', 2, 'lombrat', 0.0, 'avg_sos', [10,240.0], 'sd_sos', [30.0,30],'avg_eos', [210.0,330], 'sd_eos', [40.0,30],'avg_tom', [130.0,280], 'sd_tom', [30,30], 'log_text', 'pheno imposed')
     ENDIF
     IF (site_info.site_code[t]) EQ 'IT-Ro4' THEN BEGIN
       ;pheno = CREATE_STRUCT('ngspy', 2, 'lombrat', 0.0, 'avg_sos', [1.0,220.0], 'sd_sos', [20.0,20],'avg_eos', [210.0,350], 'sd_eos', [20.0,20],'avg_tom', [140.0,290], 'sd_tom', [20,20], 'log_text', 'pheno imposed')
@@ -208,7 +228,6 @@ FUNCTION A_simInvMod_handler_water_lim, ini_fn, clumping
     siteSimNDVI = [!NULL]
     siteSimNDVIJD = [!NULL]
 
-    skippedBecauseNoModis = 0
 
     IF CHECK_MATH() NE 0 THEN BEGIN
       PRINT, 'Math error occurred before here'
@@ -581,6 +600,7 @@ FUNCTION A_simInvMod_handler_water_lim, ini_fn, clumping
         ;in this case all the period tJD[0]- up to the next valid must be skipped
       ENDFOR ;s on season 1 and 2 (if any)
     ENDFOR ;y on number of years of a given site
+    
     ; here we finished the site, look at a fair comparsion betwen EC data, MODIS and sim
     ; simulated data may be overlapping (the same tine period may be represented in two subsequent simulations. Take the mean for now
     ; it may happen that a site (fr-Mau as of Josh version in March 2017) has all NAN observations, manage the case
@@ -618,7 +638,7 @@ FUNCTION A_simInvMod_handler_water_lim, ini_fn, clumping
       ;fill it with sim values, where available
       match, siteEc_JD, siteResmplSimJD, sub_Ec_JD, subSimJD
       siteResmplSimGpp_offSeason[sub_Ec_JD] = siteResmplSimGpp[subSimJD]
-      ;now get the available gpp estimates form MODIS
+      ;now get the available gpp estimates from MODIS
       siteModisGpp = siteEc_gpp * !VALUES.F_NAN
       match, siteEc_JD, RefGpp_data.JD, sub_Ec_JD, subModisJD
       siteModisGpp[sub_Ec_JD] = RefGpp_data.Gpp_daily[subModisJD]
@@ -627,7 +647,71 @@ FUNCTION A_simInvMod_handler_water_lim, ini_fn, clumping
 
       siteModisNDVI = (modis_data.R2 - modis_data.R1) / (modis_data.R2 + modis_data.R1)
       NDVIobsJD = modis_data.JD
-
+      
+      ;now some compuattion to get: site meaa yera by year, overall site mean
+      ;what I should use (they all have same dimensions):
+      ;siteEc_gpp
+      ;siteEc_JD
+      ;siteResmplSimGpp_offSeason
+      ;from this I have to how many years I have and then compute sums over the year (multplu everithin by 8 as GPP is mean 8 day GPP)
+      ;I have to consider data only where EC GPP is available and when only a full year is covered 90% of the time
+      
+      ;open required files
+      dlmtr=','
+      res = FILE_SEARCH(site_yearGPP_report)
+      IF (res EQ '') THEN BEGIN
+        ;it does not exists, open it and write hdr
+        OPENW, lunSYGR, site_yearGPP_report, /GET_LUN
+        PRINTF, lunSYGR, 'Site, IGBP, lat, lon, Year, crop_type, EC_year_GPP, Sim_year_GPP, MOD_year_GPP,n_8day_periods'
+      ENDIF ELSE BEGIN
+        ;it exists, no hdr needed, apppend results
+        OPENW, lunSYGR, site_yearGPP_report, /GET_LUN, /APPEND
+      ENDELSE
+      
+      ;1 transform JD into YYYY
+      siteEc_YYYY=JD2YEAR(siteEc_JD)
+      ;2 get the list of unique year
+      siteYearList = UNIQ(siteEc_YYYY, SORT(siteEc_YYYY))
+      siteYearList = siteEc_YYYY[siteYearList]
+      ;3 year by year check 95% available
+      ;  if yes store EC GPP annual and Sim and MODIS annual (year by year), with site name
+   
+      FOR yy = 0, N_ELEMENTS(siteYearList)-1 DO BEGIN
+        indYear = WHERE(siteEc_YYYY EQ siteYearList[yy], nYear)
+        ;extract the year
+        EC_GPP_YY = siteEc_gpp[indYear]   
+        EC_Sim_YY = siteResmplSimGpp_offSeason[indYear]
+        EC_MOD_YY = siteModisGpp[indYear]
+        indFin_EC_GPP_YY = WHERE(FINITE(EC_GPP_YY),n_EC_GPP_YY)
+        ;here mya happen that they do have the same number of finite, manage in plotinterannual
+        EC_yearly_GPP = [EC_yearly_GPP, TOTAL(EC_GPP_YY[indFin_EC_GPP_YY]*8)]
+        Sim_yearly_GPP = [Sim_yearly_GPP,TOTAL(EC_Sim_YY[indFin_EC_GPP_YY]*8)]
+        MOD_yearly_GPP = [MOD_yearly_GPP,TOTAL(EC_MOD_YY[indFin_EC_GPP_YY]*8)]
+        n8day_yearly_GPP = [n8day_yearly_GPP, n_EC_GPP_YY]
+        
+        
+        ;retrieve other info from array of structure site_lat_crop_type
+        arr_ind = WHERE(STRUPCASE(site_lat_crop_type[*].SITE_CODE) EQ  STRUPCASE(site_info.site_code[t]), count_arr)
+        IF (count_arr NE 1) THEN STOP
+        ;find what crop (if the info is available)
+        IF ((siteYearList[yy] LT 2000) OR (siteYearList[yy] GT 2016)) THEN BEGIN
+          crop_type_yearly_GPP = [crop_type_yearly_GPP,'']
+        ENDIF ELSE BEGIN
+          crop_type_yearly_GPP = [crop_type_yearly_GPP,site_lat_crop_type[arr_ind].CROP_TYPE[siteYearList[yy]-2000]]
+        ENDELSE
+        lat_yearly_GPP = [lat_yearly_GPP,site_lat_crop_type[arr_ind].lat]
+        lon_yearly_GPP = [lon_yearly_GPP,site_lat_crop_type[arr_ind].lon]
+        ;get site code
+        site_code_yearly_GPP =  [site_code_yearly_GPP, site_info.site_code[t]]
+        ;get IGBP
+        IGBP_yearly_GPP =  [IGBP_yearly_GPP, site_info.igbp[t]]
+        ;get the year
+        yyyy_yearly_GPP = [yyyy_yearly_GPP,siteYearList[yy]]
+        ;PRINTF, lunSYGR, 'Site, IGBP, lat, lon, Year, crop_type, EC_year_GPP, Sim_year_GPP, MOD_year_GPP'
+        PRINTF, lunSYGR, site_code_yearly_GPP[-1] + dlmtr + IGBP_yearly_GPP[-1] + dlmtr + STRING(lat_yearly_GPP[-1])+ dlmtr + STRING(lon_yearly_GPP[-1]) + dlmtr + STRING(yyyy_yearly_GPP[-1]) + $
+                         dlmtr + crop_type_yearly_GPP[-1]+ dlmtr + STRING(EC_yearly_GPP[-1]) + dlmtr + STRING(Sim_yearly_GPP[-1]) + dlmtr + STRING(MOD_yearly_GPP[-1]) + dlmtr + STRTRIM(n_EC_GPP_YY,2)
+      ENDFOR
+      FREE_LUN, lunSYGR
       ;now some plots and than regression plotSiteResults_v2
       ;ret = plotSiteResults(pheno.lombrat, siteEc_JD, siteSimNDVIJD, NDVIobsJD, siteEc_gpp, siteResmplSimGpp_offSeason, siteModisGpp, siteModisNDVI,  siteSimNDVI, site_info.igbp[t], site_info.site_code[t], site_run_reportFn, out_dir)
       ret = plotSiteResults_v2(pheno.lombrat, siteEc_JD, siteSimNDVIJD, NDVIobsJD, siteEc_gpp, siteResmplSimGpp_offSeason, siteModisGpp, siteModisNDVI,  siteSimNDVI, site_info.igbp[t], site_info.site_code[t], site_run_reportFn, out_dir)
@@ -645,10 +729,16 @@ FUNCTION A_simInvMod_handler_water_lim, ini_fn, clumping
       ENDIF
     ENDIF ;ISA(siteResmplSimJD)
   ENDFOR  ;t on n_sites
+  
   ;here we finished all sites, plot scatterplots for all
-  IF ISA(multiSiteYearSimGpp) THEN $
+  IF ISA(multiSiteYearSimGpp) THEN BEGIN
     ret = plotAll(multiSiteYearSimGpp, multiSiteYearEcGpp, multiSiteYearModisGPP, multiSiteYearSiteCode, multiSiteYearSiteId, multiSiteYearSiteIGBP, overall_run_reportFn, out_dir)
+    ;make plots of interannual variability and compute the mean by site and save it into the file site_meanSiteYearlyGPP_report
+    ret = plotInterannual(out_dir, site_meanSiteYearlyGPP_report,EC_yearly_GPP, Sim_yearly_GPP, MOD_yearly_GPP, site_code_yearly_GPP, IGBP_yearly_GPP, lat_yearly_GPP, lon_yearly_GPP, crop_type_yearly_GPP, yyyy_yearly_GPP, n8day_yearly_GPP)
+  ENDIF
   FREE_LUN, lunLog
+   
+  
   CLOSE, /ALL
   PRINT, 'Finished'
 END

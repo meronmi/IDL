@@ -1,7 +1,7 @@
 ;********** Program that makes a scatter plot from vectors (that can be selected from images)
 ;********** Date 12-1-2015
 
-pro DensityAndFit_log_scale, data01, data02, x_label, y_label, dir_output, data1_range, data2_range, ngrid, nlevels, TITLE=title, BIN1=bin1in, $
+pro DensityAndFit_log_scale, data01, data02, x_label, y_label, dir_output, data1_range, data2_range, ngrid, nlevels, TITLE=title, BIN1=bin1in,  BIN2=bin2in, $
   DOFIT = dofit, LOGFIT=logfit, $
   OLS_STAT = ols_stat, $ ;variable where to store OLS stats
   DOGRMF= dogmrf, FILESUFFIX = filesuffix, NOWIN=nowin, RGBTAB = rgbtab, SIMPLE = simple, DOLOG = dolog, PLOT1TO1 = plot1to1, $
@@ -11,7 +11,8 @@ pro DensityAndFit_log_scale, data01, data02, x_label, y_label, dir_output, data1
   SAVECSV = savecsv, $ ;1 to save a csv with data
   TOTALN = totaln, $ ;total number of obs to be used in the csv (made for area and pheno)
   WEIGHT = weight, $;1D array of the same dimension as data1 and data2 which holds the weighted values associated with each V1 and V2 element.
-  FULL_FILENAME_IMPOSED = fn_imposed
+  FULL_FILENAME_IMPOSED = fn_imposed, $
+  DEK36PLOT = dek36plot  ;plot a sos vs eos scatter
 
 
   ;make a copy of input
@@ -74,17 +75,19 @@ pro DensityAndFit_log_scale, data01, data02, x_label, y_label, dir_output, data1
   min1=data1_range(0) & max1=data1_range(1)
   min2=data2_range(0) & max2=data2_range(1)                                            ;**** min and maxim values according the defined range
 
-  bin1=DOUBLE(max1-min1)/DOUBLE(ngrid)
+  bin1=DOUBLE(max1-min1)/DOUBLE(ngrid-1.0) ;-1.0 added back on 20/5/2019
   IF (N_ELEMENTS(bin1in) GT 0) THEN bin1 = bin1in
-  bin2=DOUBLE(max2-min2)/DOUBLE(ngrid)
+  bin2=DOUBLE(max2-min2)/DOUBLE(ngrid-1.0) ;-1.0 added back on 20/5/2019 
+  IF (N_ELEMENTS(bin2in) GT 0) THEN bin2 = bin2in
   hist=hist2d_mic(data1,data2,weight,BINSIZE1=bin1,BINSIZE2=bin2,max1=max1,max2=max2,min1=min1,min2=min2, OBIN1=Obin1, OBIN2=Obin2, BINEDGE1=-1, BINEDGE2=-1) ;***two dimensional density function (histogram) of two variables.
   ;in idl the max1 and max2 are placed in an additional bin because IDL works with >= and < to get the number of obs
   ;so I flip the last row and last colum on the previous ones
-  hist2 = hist[0:-2,0:-2]
-  hist2[*,-1] = hist2[*,-1] + hist[*,-1]
-  hist2[-1,*] = hist2[-1,*] + hist[-1,*]
-  hist = hist2
-  hist2 = 0
+  ;???? I can get why I made so.., omit its
+;  hist2 = hist[0:-2,0:-2]
+;  hist2[*,-1] = hist2[*,-1] + hist[*,-1]
+;  hist2[-1,*] = hist2[-1,*] + hist[-1,*]
+;  hist = hist2
+;  hist2 = 0
   IF KEYWORD_SET(savecsv) THEN BEGIN
     dlmtr = ','
     IF (N_ELEMENTS(filesuffix) GT 0) THEN  fncsv=dir_output + '\' + filesuffix + '_scatter.csv' ELSE $
@@ -146,7 +149,10 @@ pro DensityAndFit_log_scale, data01, data02, x_label, y_label, dir_output, data1
     IF ((N_ELEMENTS(range_in) EQ 0) AND (N_ELEMENTS(rangeinlow) EQ 0)) THEN ghc = IMAGE(hist, POSITION=[0.2,0.25,0.8,0.85] , AXIS_STYLE=0, RGB_TABLE=rgbtab, DIMENSIONS=[600,600], BUFFER = buf)
 
     ;new with hist2d_mic
-    ghp = PLOT([0,1], POSITION=[0.2,0.25,0.8,0.85], AXIS_STYLE=2, XRANGE=[min1,max1], YRANGE=[min2,max2], DIMENSIONS=[600,600],XTICKDIR=1, YTICKDIR=1, XTITLE=xtit, YTITLE=ytit, FONT_SIZE = 12, /NODATA, /CURRENT)
+    ;ghp = PLOT([0,1], POSITION=[0.2,0.25,0.8,0.85], AXIS_STYLE=2, XRANGE=[min1,max1], YRANGE=[min2,max2], DIMENSIONS=[600,600],XTICKDIR=1, YTICKDIR=1, XTITLE=xtit, YTITLE=ytit, FONT_SIZE = 12, /NODATA, /CURRENT)
+    IF (N_ELEMENTS(dek36plot) GT 0) THEN $
+      ghp = PLOT([0,1], POSITION=[0.2,0.25,0.8,0.85], AXIS_STYLE=2, XRANGE=[min1,max1+bin1], YRANGE=[min2,max2+bin2], DIMENSIONS=[600,600],XTICKDIR=1, YTICKDIR=1, XTITLE=xtit, YTITLE=ytit, FONT_SIZE = 12, /NODATA, /CURRENT, XTICKVALUES=[3,6,9,12,15,18,21,24,27,30,33,36], XMINOR=2, YTICKVALUES=[3,6,9,12,15,18,21,24,27,30,33,36], YMINOR=2) $
+      ELSE ghp = PLOT([0,1], POSITION=[0.2,0.25,0.8,0.85], AXIS_STYLE=2, XRANGE=[min1,max1+bin1], YRANGE=[min2,max2+bin2], DIMENSIONS=[600,600],XTICKDIR=1, YTICKDIR=1, XTITLE=xtit, YTITLE=ytit, FONT_SIZE = 12, /NODATA, /CURRENT)
     t = TEXT(0.5,0.88, tmp, FONT_STYLE = 1, ALIGNMENT=0.5)
   ENDIF ELSE BEGIN
     ;ghc = CONTOUR(hist,divx,divy,/fill,C_VALUE=cvalue, RGB_TABLE=rgbtab, $

@@ -1,11 +1,29 @@
-PRO B_harvest_pheno_and_correct
+PRO B_harvest_pheno_and_correct, all_in_a_STRUCTURE = all_in_a_STRUCTURE
 ;work only on normal
 ;take the length files of all runs 
 ;find GSL GE GSL_Threshold an check if they were excluded in the max and range runs. If so, it excluded them.
 
 GSL_Threshold = 15 ;18 until 20 mar 2018
+IF KEYWORD_SET(all_in_a_STRUCTURE) EQ 1 THEN BEGIN
+  ;"decompress" the big structure if it was sent here
+  runVersion = all_in_a_STRUCTURE.runVersion
+  prefix = all_in_a_STRUCTURE.prefix
+  suffix = all_in_a_STRUCTURE.suffix
+  dateformat = all_in_a_STRUCTURE.dateformat
+  dir_lta = all_in_a_STRUCTURE.dir_lta
+  dir_PHENOdef = all_in_a_STRUCTURE.dir_PHENOdef
+  ;New thresholds 0.25-0.35
+  phenoDefFullPath = all_in_a_STRUCTURE.phenoDefFullPath
+  base_dir_pheno_out =  all_in_a_STRUCTURE. base_dir_pheno_out
+  phenoDirOut = all_in_a_STRUCTURE.phenoDirOut
+  merged_fixed_dir = all_in_a_STRUCTURE.merged_fixed_dir
+  target_area_fn = all_in_a_STRUCTURE.target_area_fn
+  cm_fn = all_in_a_STRUCTURE.cm_fn
+  devDir = all_in_a_STRUCTURE.devDir
+ENDIF ELSE BEGIN
+  dir_pheno_def, dir_PHENOdef, dir_lta, phenoDefFullPath, phenoDirOut, merged_fixed_dir, target_area_fn, cm_fn, prefix, suffix, dateformat, runVersion, devDir
+ENDELSE
 
-dir_pheno_def, dir_PHENOdef, dir_lta, phenoDefFullPath, phenoDirOut, merged_fixed_dir, target_area_fn, cm_fn, prefix, suffix, dateformat, runVersion
 dir_normal = phenoDirOut.normal
 ;dir_normal = 'Y:\remote_sensing\vgt\Pheno_Oct_2016\PhenoV2\pheno_SOS025'
 ;dir_normal = 'Y:\remote_sensing\vgt\Pheno_Oct_2016\PhenoV1\pheno_SOS015'
@@ -24,9 +42,14 @@ dir_sen = phenoDirOut.sen
 dir_out =  merged_fixed_dir
 ;dir_out = 'Y:\remote_sensing\vgt\Pheno_Oct_2016\PhenoV1\merged_fixedV1'
 
-ns = 40320
-nl = 14673
 
+;ns = 40320
+;nl = 14673
+
+fn_hdr = FILE_SEARCH(dir_lta+'\*.hdr')
+fn_hdr = fn_hdr[0]
+ns = read_info('samples', fn_hdr)
+nl = read_info('lines', fn_hdr)
 
 lenNormRunMat = BYTARR(ns, nl)
 lenMaxRunMat = BYTARR(ns, nl)

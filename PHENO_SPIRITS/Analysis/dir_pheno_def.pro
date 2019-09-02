@@ -1,8 +1,34 @@
 PRO dir_pheno_def, dir_PHENOdef, dir_lta, phenoDefFullPath, phenoDirOut, merged_fixed_dir, target_area_fn, cm_fn, prefix, suffix, dateformat, runVersion, devDir
-  run = 'boku_v1_2018_03';'boku_v2';'vgt_preMaxGapOn' ;'vgt_preMaxGapOff'
+  run = 'cop_fap';'boku_v1_2018_03';'boku_v2';'vgt_preMaxGapOn' ;'vgt_preMaxGapOff'
   ;after 2017, the bats files can be launched ONLY from the dev directory
   devDir = 'X:\dev'
+  
   CASE run OF
+    'cop_fap': BEGIN
+      runVersion = '1_copfap_2019';'2'
+      prefix = 'LTAR6_'
+      suffix = '""'
+      dateformat = '5'
+      dir_lta = '\\ies\d5\foodsec\Share\COP_FAPAR\FROM CID LTA_99-18';'Y:\remote_sensing\boku\Test Michele\LTA\OF'
+      dir_PHENOdef = '\\ies\d5\foodsec\Share\COP_FAPAR\Pheno'
+      ;New thresholds 0.25-0.35
+      phenoDefFullPath = {normal:  dir_PHENOdef + '\' + 'pheno_025035_cop_fap_v1_2019_SOS', $
+        sen:  dir_PHENOdef + '\' +                      'pheno_025035_cop_fap_v1_2019_SEN', $
+        max:  dir_PHENOdef + '\' +                      'pheno_025035_cop_fap_v1_2019_MAX', $    ;note that max is the same of sos, except max
+        range:  dir_PHENOdef + '\' +                    'pheno_025035_cop_fap_v1_2019_RNG'}
+      ;                                                pheno_SOS025range_boku_v1_2018
+      base_dir_pheno_out =  dir_PHENOdef + '\' + 'PhenoV' + runVersion
+      phenoDirOut = {normal:  base_dir_pheno_out + '\' + 'pheno_SOS_eos', $
+        dir_out: base_dir_pheno_out, $
+        sen:  base_dir_pheno_out + '\' + 'pheno_SOS_sen', $
+        max:  base_dir_pheno_out + '\' + 'pheno_SOS_max', $
+        range:  base_dir_pheno_out + '\' + 'pheno_SOS_range'}
+      merged_fixed_dir = base_dir_pheno_out + '\1merged_fixed'
+      ;we keep the followings as they refer to the correct VGT grid (also used by cop fapar)
+      target_area_fn = '\\ies\d5\asap\boku\V1\pheno\suppression_second_season\Gauls_where_to_suppress_boku_v1_2018.img';'Y:\remote_sensing\boku\Pheno_17-01-2017\raster for second season\Gauls_where_to_suppress_bk.img'
+      cm_fn = '\\ies\d5\asap\boku\V1\pheno\cropAFI\mask_crop_afi_v2.2.img';'Y:\remote_sensing\boku\ref\crop_mask\mask_crop_afi_bk.img'
+
+    END
     'boku_v1_2018_03': BEGIN
       runVersion = '1_2018';'2'
       prefix = 'OF_LTA'

@@ -1,0 +1,253 @@
+FUNCTION locate_largest_season_in_jd_range_v2, xjd, y, rangejd_mins, rangejd_max, indexName
+; Michele Meroni, April 2019
+;  
+; y: is the index (typlically ndvi, can be VH/VV)
+; xjd: is the time interval containing the season of interest. IT MUST contain the full year + a bit of previous (season can start there) and IT MAY
+; contain a bit of the the following year
+; rangejd_mins: the preferred range, in julian days, of the year of interest where to look for the largest season minima 
+; rangejd_max: the preferred range, in julian days, of the year of interest where to look for the largest season maximum, if there is no, rangejd_mins will be used
+;  
+; NOTE that minima in rangejd_mins and maxima in rangejd_max will be preferred to those occurring outside (even if they are smaller minima)
+; RETURN THE left and right subscript of minima
+
+
+thershold_amplitudeP2P5lim = 0.9        ; fraction of the value of the grow (decay) amplitude used to set the upper (lower) limit of the tanh flex point.
+thershold_amplitudeP2P5fg = 0.5         ; fraction of the value of the grow (decay) amplitude used to set the first guess of the tanh flex point.
+                                 
+doplot = 0                       ;1 for plotting results of the function
+
+; the function smooth the y values to get estimates of the minima and maxima, check that at very least 10 obs are available
+IF (N_ELEMENTS(y) LE 10) THEN BEGIN
+  season = CREATE_STRUCT('retr', 0, 'code', FIX(0),'msg', '')
+  season.retr = -1
+  season.code = -200
+  season.msg = 'locate_largest_season_in_jd_range: less than 10 data points'
+  RETURN, season
+ENDIF
+
+;linearly iterpolate y over a regular daily grid
+xjd_reg = FINDGEN(xjd[-1]-xjd[0]+1)+xjd[0] 
+;first linear interpolate
+y_reg = INTERPOL(y, xjd, xjd_reg)
+
+
+;not necessary, it will interpolate again in savgol
+;cloud = y_reg *0.0 + 1 
+;FOR i = 0, N_ELEMENTS(xjd)-1 DO BEGIN
+;  ind = WHERE(xjd[i] EQ xjd_reg)
+;  y_reg[ind] = y[i]
+;  ;cloud[ind] = 0
+;ENDFOR
+
+IF (indexName EQ 'RVI') THEN stop ;to be checked 
+
+IF (indexName EQ 'NDVI_mean') THEN BEGIN 
+  maxNDVI = 1.0
+  minNDVI = 0
+  cloud = FLTARR(N_ELEMENTS(y_reg))*0.0  
+  ;smooth the y
+  width_climatology= 75
+  width_on_upper_env = 45
+  sago_interpol3_for_s2, y_reg, cloud, width_climatology, width_on_upper_env, smNDVI=y_regs1, iMax=100, maxNDVI=maxNDVI, minNDVI=minNDVI
+  ;smooth again to remove hi-frequency variations (with one fit only there are a still some up down that are no good for extrema)
+  width_climatology= 60
+  width_on_upper_env = 30
+  sago_interpol3_for_s2, y_regs1, cloud, width_climatology, width_on_upper_env, smNDVI=y_regs2, iMax=100, maxNDVI=maxNDVI, minNDVI=minNDVI
+ENDIF ELSE BEGIN
+  ;it is VH/VV
+  maxNDVI = 10.0
+  minNDVI = -1000 
+  width = 45
+  sago_interpol3_for_s1, y_reg, width, smNDVI=y_regs1, maxNDVI=maxNDVI, minNDVI=minNDVI
+  width = 30
+  sago_interpol3_for_s1, y_regs1, width, smNDVI=y_regs2, maxNDVI=maxNDVI, minNDVI=minNDVI
+ENDELSE  
+
+;here we should have  a resonably smoothed function
+;store the smoothed values for the observation points
+;ind of xjd that are sharee by xjd_reg
+match, LONG(xjd), LONG(xjd_reg), sub_xjd, sub_xjd_reg
+season = CREATE_STRUCT('subLeft', 0, 'subRight', 0, 'subMax', 0, 'xjdLimP2', 0.0, 'xjdLimP5', 0.0, 'xjdFgP2', 0.0, 'xjdFgP5', 0.0, $
+  'y_reg_smooth', y_regs2, 'y_obs_smooth', y_regs2[sub_xjd_reg], $
+  'ySmoothAtSubLeft', 0.0, 'ySmoothAtSubRight', 0.0, 'ySmoothAtSubMax', 0.0, 'retr', 0, 'code', FIX(0),'msg', '')
+
+;locate all max and min using extrema (extrema finds any relative max or mean) 
+;mirror edges so that monotonic increment will generate a min on the left side and a max on the right side
+;conversely, a monotonic decrease will generate a max on the left and min on the right
+y_regs2_edged = [REVERSE(y_regs2[1:5]),y_regs2,REVERSE(y_regs2[-6:-2])]
+subExtrema = Extrema(y_regs2_edged, signature = sig, number = num)
+;bring it back to non edged dimensions
+subExtrema = subExtrema - 5
+ind = WHERE((subExtrema GE 0) AND (subExtrema LE (N_ELEMENTS(y_regs2)-1)), count)
+IF (count GT 0) THEN BEGIN
+  subExtrema = subExtrema[ind[SORT(ind)]]
+  sig = sig[ind[SORT(ind)]]
+ENDIF
+  
+;Work on Maxima
+subY_OfMax = subExtrema[WHERE(sig EQ 1)]
+;get the values of the maxima in range to determine the biggest, first looking in rangejd_max
+;1. check if there is one or more maxima in the required range (if not look into rangejd_mins)
+indM = WHERE((xjd_reg[subY_OfMax] GE rangejd_max[0]) AND (xjd_reg[subY_OfMax] LE rangejd_max[1]), countM)
+IF (countM GT 0) THEN BEGIN
+  subY_OfMaximaInPeriod = subY_OfMax[indM] 
+  maxInWhichRange = 'rangejd_max'
+ENDIF ELSE BEGIN ;there is no, look in the wider period defined by rangejd_mins
+  indM = WHERE((xjd_reg[subY_OfMax] GE rangejd_mins[0]) AND (xjd_reg[subY_OfMax] LE rangejd_mins[1]), countM)
+  IF (countM GT 0) THEN BEGIN
+    subY_OfMaximaInPeriod = subY_OfMax[indM]
+    maxInWhichRange = 'rangejd_mins'
+  ENDIF ELSE BEGIN
+    ;return -100 (no relative maxima in the required period)
+    season.retr = -1
+    season.code = -100
+    season.msg = 'locate_largest_season_in_jd_range: no relative maxima in the required period (neither rangejd_max, nor rangejd_mins)'
+    RETURN, season
+  ENDELSE
+ENDELSE
+;If I am here there is one or more maxima in the small (rangejd_max) or large range (rangejd_mins), now find out the biggest
+res = MAX(y_regs2[subY_OfMaximaInPeriod], ind)
+subY_BiggestMaxInPeriod = subY_OfMaximaInPeriod[ind]
+subExt_OfBiggestMaxInPeriod = WHERE(subExtrema EQ subY_BiggestMaxInPeriod)
+;Some checks:
+
+;*This is obsolete 
+;1: is there a max in the required period? If not, return -100 (no relative maxima in the required period)
+;IF (ind EQ -1) THEN BEGIN
+;  season.retr = -1
+;  season.code = -100
+;  season.msg = 'locate_largest_season_in_jd_range: no relative maxima in the required period'
+;  RETURN, season
+;ENDIF*
+
+;2: Does it has at least 3 obs in each side? If not, return -101 or -102 (relative maxima too close to data boundaries, left / right)
+IF (subY_BiggestMaxInPeriod LT 3) THEN BEGIN
+  season.retr = -1
+  season.code = -101
+  season.msg = 'locate_largest_season_in_jd_range: relative maximum in the required period too close to left data boundary (less than 3 obs). The series should have more past data'
+  RETURN, season
+ENDIF
+IF (subY_BiggestMaxInPeriod GT N_ELEMENTS(y_regs2)-4) THEN BEGIN
+  season.retr = -1
+  season.code = -102
+  season.msg = 'locate_largest_season_in_jd_range: relative maximum in the required period too close to right data boundary (less than 3 obs). The series should have more recent data'
+  RETURN, season
+ENDIF
+;3: is there a min after and before this maximum? If not, set it at the beginning/end of the data (the function may be monotonic and the trick of mirroring resulted in a min
+;that is slightly outside y_regs2 and it is therefore removed
+; 3a: left side
+IF (subExt_OfBiggestMaxInPeriod EQ 0) THEN BEGIN ;ther is no, add one to the left
+  subExtrema = [0, subExtrema]
+  sig = [-1,sig] 
+  subExt_OfBiggestMaxInPeriod = subExt_OfBiggestMaxInPeriod + 1
+  season.code = -200
+  season.msg = 'locate_largest_season_in_jd_range: there was no min before the max in the period of interest, it was fixed to first data point (the series should have more past data)'
+ENDIF
+; 3a: right side
+IF (subExt_OfBiggestMaxInPeriod EQ N_ELEMENTS(subExtrema)-1) THEN BEGIN ;ther is no, add one to the right
+  subExtrema = [subExtrema,N_ELEMENTS(y_regs2)-1]
+  sig = [sig,-1]
+  season.code = -201
+  season.msg = 'locate_largest_season_in_jd_range: there was no min after the max in the period of interest, it was fixed to last data point (the series should have more recent data)'
+ENDIF
+
+
+;Work on Minima
+;now find which minima before and after the max should be reasonably selected. The idea is that we don't want to take the smallest minima because
+;the min between two season very close to each other may be skipped in this way 
+;locate the elements of estrema that are within the rangejd_mins
+subExt_OfElementsInPeriod = WHERE((xjd_reg[subExtrema] GE rangejd_mins[0]) AND (xjd_reg[subExtrema] LE rangejd_mins[1]))
+inRange = subExtrema * 0
+inRange[subExt_OfElementsInPeriod] = 1
+;now get the jd of the two minima and find the closest jd in original data
+;subExt_MinLeft = findMinAwayFromMax(subExtrema, sig, subExt_OfBiggestMaxInPeriod, inRange, y_regs2, 'left')
+;subExt_MinRight = findMinAwayFromMax(subExtrema, sig, subExt_OfBiggestMaxInPeriod, inRange, y_regs2, 'right')
+subExt_MinLeft = findMinAwayFromMax2(subExtrema, sig, subExt_OfBiggestMaxInPeriod, inRange, y_regs2, 'left')
+subExt_MinRight = findMinAwayFromMax2(subExtrema, sig, subExt_OfBiggestMaxInPeriod, inRange, y_regs2, 'right')
+subY_MinLeft =  subExtrema[subExt_MinLeft]
+subY_MinRight =  subExtrema[subExt_MinRight]
+xjdLeft =  xjd_reg[subY_MinLeft]
+xjdRight =  xjd_reg[subY_MinRight]
+xjdMax = xjd_reg[subY_BiggestMaxInPeriod]
+
+;Limits for p2 and p5, the inflection points of the left and right hyper tangent
+;I have the position (and values for left_min-> max->right_min over which I will optimize 
+;Now set limit for p2, the left inflection point that I do not want to be too close to the maximum
+;upper limit it at the time at wich the fitted curve is 90% of amplitude up  
+ythresh = y_regs2[subY_MinLeft] + thershold_amplitudeP2P5lim*(y_regs2[subY_BiggestMaxInPeriod]-y_regs2[subY_MinLeft])
+ind = WHERE(y_regs2[subY_MinLeft:subY_BiggestMaxInPeriod] GE ythresh[0])
+xjdLimP2 = xjd_reg[ind[0]+subY_MinLeft]  
+;now fg
+ythresh = y_regs2[subY_MinLeft] + thershold_amplitudeP2P5fg *(y_regs2[subY_BiggestMaxInPeriod]-y_regs2[subY_MinLeft])
+ind = WHERE(y_regs2[subY_MinLeft:subY_BiggestMaxInPeriod] GE ythresh[0])
+xjdFgP2 = xjd_reg[ind[0]+subY_MinLeft]
+;Now limit for p5
+ythresh = y_regs2[subY_MinRight] + thershold_amplitudeP2P5lim*(y_regs2[subY_BiggestMaxInPeriod]-y_regs2[subY_MinRight])
+ind = WHERE(y_regs2[subY_BiggestMaxInPeriod:subY_MinRight] LE ythresh[0])
+xjdLimP5 = xjd_reg[ind[0]+subY_BiggestMaxInPeriod]
+;now fg
+ythresh = y_regs2[subY_MinRight] + thershold_amplitudeP2P5fg *(y_regs2[subY_BiggestMaxInPeriod]-y_regs2[subY_MinRight])
+ind = WHERE(y_regs2[subY_BiggestMaxInPeriod:subY_MinRight] LE ythresh[0])
+xjdFgP5 = xjd_reg[ind[0]+subY_BiggestMaxInPeriod]
+ 
+IF (doplot eq 1) THEN BEGIN
+  h = PLOT(xjd_reg, y_reg)
+  h = PLOT(xjd, y, SYMBOL='o', LINESTYLE='',/OVERPLOT)
+  ;h = PLOT(xjd_reg, y_regs1, LINESTYLE='-',COLOR='grey',/OVERPLOT)
+  h = PLOT(xjd_reg, y_regs2, LINESTYLE='-',COLOR='r',/OVERPLOT)
+  yr = h.YRANGE
+  h = PLOT([xjd_reg[subY_MinLeft],xjd_reg[subY_MinLeft]],yr, LINESTYLE='-',COLOR='b',/OVERPLOT)
+  h = PLOT([xjd_reg[subY_BiggestMaxInPeriod],xjd_reg[subY_BiggestMaxInPeriod]], yr, LINESTYLE='--',COLOR='black', /OVERPLOT)
+  h = PLOT([xjd_reg[subY_MinRight],xjd_reg[subY_MinRight]], yr, LINESTYLE='-',COLOR='g',/OVERPLOT)
+  h = PLOT([xjdLimP2,xjdLimP2], yr, LINESTYLE=':',COLOR='black', /OVERPLOT)
+  h = PLOT([xjdLimP5,xjdLimP5], yr, LINESTYLE=':',COLOR='black', /OVERPLOT)
+  h = PLOT([xjdFgP2,xjdFgP2], yr, LINESTYLE=':',COLOR='green', /OVERPLOT)
+  h = PLOT([xjdFgP5,xjdFgP5], yr, LINESTYLE=':',COLOR='green', /OVERPLOT)
+  h.close
+ENDIF
+res = MIN(ABS(xjd-xjdLeft[0]), subLonOriginalData) 
+res = MIN(ABS(xjd-xjdRight[0]), subRonOriginalData) 
+res = MIN(ABS(xjd-xjdMax), subMaxOnOriginalData)
+season.retr = 1
+season.subLeft=subLonOriginalData
+season.subRight=subRonOriginalData
+season.subMax=subMaxOnOriginalData
+season.ySmoothAtSubLeft=y_regs2[subY_MinLeft]
+season.ySmoothAtSubRight=y_regs2[subY_MinRight]
+season.ySmoothAtSubMax=y_regs2[subY_BiggestMaxInPeriod]
+;with very few observation it may happen that xjdFgPx, that is set on the smoothed curve, are out of the interval
+;defined by xjd[subLonOriginalData] and jd[subRonOriginalData] and give bad parameter error in the optimization. Set them to the most
+;reasonables value (halfway between min and max.
+;1. Check left side
+IF (xjdFgP2 LE xjd[subLonOriginalData]) THEN BEGIN
+  xjdFgP2 = xjd[subLonOriginalData] + (xjd[subMaxOnOriginalData]-xjd[subLonOriginalData])/2.0
+  ;now fix the lim if the new first guess is beyond it
+  IF (xjdLimP2 LE xjdFgP2) THEN xjdLimP2 = xjd[subMaxOnOriginalData]
+ENDIF
+;2. Check right side 
+IF (xjdFgP5 GE xjd[subRonOriginalData]) THEN BEGIN
+  xjdFgP5 = xjd[subMaxOnOriginalData] + (xjd[subRonOriginalData]-xjd[subMaxOnOriginalData])/2.0
+  ;now fix the lim if the new first guess is beyond it
+  IF (xjdLimP5 LE xjdFgP5) THEN xjdLimP5 = xjd[subMaxOnOriginalData]
+ENDIF
+
+season.xjdLimP2=xjdLimP2
+season.xjdLimP5=xjdLimP5
+season.xjdFgP2=xjdFgP2
+season.xjdFgP5=xjdFgP5
+
+IF (xjdFgP2 LE xjd[subLonOriginalData]) THEN BEGIN
+  xjdFgP2 = xjd[subLonOriginalData] + (xjd[subMaxOnOriginalData]-xjd[subLonOriginalData])/2.0
+  ;now fix the lim if the new first guess is beyond it
+  IF (xjdLimP2 LE xjdFgP2) THEN xjdLimP2 = xjd[subMaxOnOriginalData]
+ENDIF 
+;chech that the min-max-min bump is not negiglibly small range gt 0.1 for NDVI and 1 db for the ratio
+IF (indexName EQ 'NDVI_mean') THEN thr = 0.1 ELSE thr = 2.0
+IF ((season.ySmoothAtSubMax - MIN([season.ySmoothAtSubLeft, season.ySmoothAtSubRight])) LT thr) THEN BEGIN
+  season.retr = 0
+  season.code = -300
+  season.msg = 'The selected bumb had a range (on the smoothed curve) smaller than 0.1 (if NDVI) or 1 (if VH/VV)'
+ENDIF
+
+RETURN, season
+END

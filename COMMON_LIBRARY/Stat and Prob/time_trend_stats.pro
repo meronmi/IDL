@@ -11,7 +11,7 @@ Function time_trend_stats, fnameY, inPath, outPath, outBaseName, validRange,  YS
 ;  Usage:
 ;     print, trendY (fnameY, inPath, ns, nl, nb, outPath, outBaseName, val999)
 ;     print, trendY ('A1sos-1997_acc1', 'Q:\WA\all sahel\data\DIR_RECOMPOSED_UppEnv\REALIGN_ON_sos\ANOMALIES\Correlation_analysis', 7841, 1458, 16, 'Q:\WA\all sahel\data\DIR_RECOMPOSED_UppEnv\REALIGN_ON_sos\ANOMALIES\Correlation_analysis\Trends', 'acc1trend999is0', 0)
-
+;     print, time_trend_stats('gpp_2001-2018_bil.img','\\ies\d5\foodsec\Users\meronmi\4ANDREA_GPP','\\ies\d5\foodsec\Users\meronmi\4ANDREA_GPP\trends', 'gpp_2001-2018', [0, 1000])
 ;  Input parameters: None.
 ;     fnameY: input bil file for Y 
 ;     inPath: path for input files
@@ -84,9 +84,17 @@ FOR line = 0, nl-1, 1L DO BEGIN
   FOR sample = 0, ns-1, 1L DO BEGIN
     x0 = FINDGEN(N_ELEMENTS(REFORM(yline[sample,*])))
     y0 = REFORM(yline[sample,*])
-    indNaN = WHERE(((y0 LT validRange[0]) OR (y0 GT validRange[1])), countNaN,  NCOMPLEMENT = countFIN)
-    IF (countFIN GE 3) THEN BEGIN
-      IF (countNaN GT 0) THEN y0[indNaN] = !VALUES.F_NAN
+    ;y may contain NaN
+    indFin = WHERE(FINITE(y0), countFin)
+    ;now check valid range
+    IF (countFIN GT 0) THEN BEGIN
+      indInvalid = WHERE(((y0[indFin] LT validRange[0]) OR (y0[indFin] GT validRange[1])), countInvalid);,  NCOMPLEMENT = countFIN)
+      IF (countInvalid GT 0) THEN indInvalid = indFin[indInvalid]
+      y0[indInvalid] = !VALUES.F_NAN
+    ENDIF
+    ;now all that is not needed is NaN
+    indFin = WHERE(FINITE(y0), countFin)
+    IF (countFin GE 3) THEN BEGIN  
       IF (N_ELEMENTS(yscaling) GT 0) THEN y0 = yscaling[0] + yscaling[1] * y0 
       ;linear regresstion stats
       ret = linregstat(x0, y0)

@@ -1,4 +1,5 @@
-PRO A_run_pheno
+PRO A_run_pheno, all_in_a_STRUCTURE = all_in_a_STRUCTURE
+;PRO A_run_pheno
 ;Note: with BOKU the the SPF are all the same (normal, max, range) becuase there are no clear problems detected
 
 ;# compute eos and sen (as a second run with higher FENeos)
@@ -13,7 +14,25 @@ PRO A_run_pheno
 ; the idea is that in arid places (max<=0.3, range<=0.2) you cannot have a season for more than a half year
 ; A_run_pheno runs the various pheno runs that are later used to correct the pheno
 
-dir_pheno_def, dir_PHENOdef, dir_lta, phenoDefFullPath, phenoDirOut, merged_fixed_dir, target_area_fn, cm_fn, prefix, suffix, dateformat, runVersion, devDir
+IF KEYWORD_SET(all_in_a_STRUCTURE) EQ 1 THEN BEGIN
+  ;"decompress" the big structure if it was sent here
+  runVersion = all_in_a_STRUCTURE.runVersion
+  prefix = all_in_a_STRUCTURE.prefix
+  suffix = all_in_a_STRUCTURE.suffix
+  dateformat = all_in_a_STRUCTURE.dateformat
+  dir_lta = all_in_a_STRUCTURE.dir_lta
+  dir_PHENOdef = all_in_a_STRUCTURE.dir_PHENOdef
+  ;New thresholds 0.25-0.35
+  phenoDefFullPath = all_in_a_STRUCTURE.phenoDefFullPath
+  base_dir_pheno_out =  all_in_a_STRUCTURE. base_dir_pheno_out
+  phenoDirOut = all_in_a_STRUCTURE.phenoDirOut
+  merged_fixed_dir = all_in_a_STRUCTURE.merged_fixed_dir
+  target_area_fn = all_in_a_STRUCTURE.target_area_fn
+  cm_fn = all_in_a_STRUCTURE.cm_fn
+  devDir = all_in_a_STRUCTURE.devDir
+ENDIF ELSE BEGIN
+  dir_pheno_def, dir_PHENOdef, dir_lta, phenoDefFullPath, phenoDirOut, merged_fixed_dir, target_area_fn, cm_fn, prefix, suffix, dateformat, runVersion, devDir
+ENDELSE
 
 on_lta = 1 ; run on lta
 
@@ -40,7 +59,7 @@ P16 = '1' & P17 = '0' & P18 = '0' & P19 = '1' & P20 = '0' & P21 = '0'
 CD, devDir
 ;OPENW, lun, dir_PHENOdef + '\' + fn_bat, /GET_LUN
 OPENW, lun, devDir + '\' + fn_bat, /GET_LUN
-PRINTF, lun, 'call GLIMset_Ydisk_user.BAT'
+PRINTF, lun, 'call GLIMset.BAT'
 ;run the normal pheno
 p11 = file_dlmtr + phenoDefFullPath.normal + file_dlmtr
 ;normal run
@@ -78,10 +97,11 @@ cmd = exePath + ' ' + $
   p17 + dlmtr + p18 + dlmtr + p19 + dlmtr + p20 + dlmtr + p21
 PRINTF, lun, cmd
 FREE_LUN, lun
-;execute it
+;execute it (if it is on another pc run it manually)
 tmp = ' > IDL_run_outputV' + runVersion +'.txt'
 SPAWN, devDir + '\' + fn_bat + tmp, res
+
 PRINT, res
-PRINT, 'finito'
+
 
 END

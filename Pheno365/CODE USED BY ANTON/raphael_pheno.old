@@ -1,0 +1,321 @@
+PRO RAPHAEL_pheno
+
+@cb_optimization.comm
+
+buffer_plots = 1 ;(0 to see them)
+extract_pheno = 1  ;with 0 just plots the data in a single graph
+;selected_crops = ['Common wheat - B11']
+selected_indices = ['NDVI_mean','VH_VV_ratio', 'VH_mean','VV_mean']
+k_sub_max = 1     ;max index to considert 0 is only first, 1 is vh vv ratio
+use_time_constrains_per_crop = 1     ;set it to 1 to have time period (used by locate_largest_season_in_jd_range_v2) per crop
+
+
+
+
+;read the file
+fn_sav = 'D:\RAPHAEL_pheno_test\LUCAS_S1-S2_extraction_20190328.sav'
+RESTORE, fn_sav
+cropTypes = x.cropname[UNIQ(x.cropname,SORT(x.cropname))]
+PRINT, 'n unique crops = ', STRING(N_ELEMENTS(cropTypes))
+PRINT, cropTypes
+selected_crops = cropTypes
+indices = x.index_name[UNIQ(x.index_name,SORT(x.index_name))]
+
+;time constrain per crop if required 
+IF (use_time_constrains_per_crop EQ 1) THEN BEGIN
+  res = READ_CSV(FILE_DIRNAME(fn_sav) + '\time_constrains_per_crop.csv', HEADER=hdr)
+  timeRangesPerCrop = rename_tags(res, TAG_NAMES(res), hdr)
+ENDIF
+
+;dir out
+stime = SYSTIME()
+stimeStr = STRMID(stime,20,4) + STRMID(stime,4,3) + STRMID(stime,8,2)
+dir_out = FILE_DIRNAME(fn_sav) + '\Results_' + stimeStr
+IF FILE_SEARCH(dir_out) EQ '' THEN BEGIN
+  FILE_MKDIR, dir_out
+ENDIF ELSE BEGIN
+  PRINT, 'Directory already exists, the program will overwrite it'
+  FILE_MKDIR, dir_out
+ENDELSE
+
+; set aside sd
+PRINT, 'Set aside NDVI_stdDev'
+indSD = WHERE(indices EQ 'NDVI_stdDev')
+indNonSD = WHERE(indices NE 'NDVI_stdDev')
+indexSD = indices[indSD]
+indexSD = indexSD[0]
+indices = indices[indNonSD]
+PRINT, 'Avaliable indices:' ;NDVI_mean NDVI_stdDev VH_mean VV_mean
+PRINT, indices
+
+;prepare for output
+dlmtr = ','
+IF (extract_pheno EQ 1) THEN BEGIN
+  OPENW, lun, dir_out+'\pheno_results.csv',/GET_LUN
+  OPENW, lunFail,dir_out+'\pheno_failures.txt',/GET_LUN
+  PRINTF, lun, STRJOIN(['Index','CROP_TYPE','ID','Area','Lat','Lon','SOS20','EOS20','LSG20','SOS50','EOS50','LSG50', $
+                        'maxFitNDVI','Slope_growth','Slope_decay','r_fir','RMSD_fit',$
+                        'nImages','maxGap', 'NDVI_SD_in_season',$
+                        'p0','p1','p2','p3','p4','p5','p6','p0_err','p1_err','p2_err','p3_err','p4_err','p5_err','p6_err',$
+                        'LocateSeason_code','LocateSeason_msg']+dlmtr)
+ENDIF
+cro_type= !NULL
+sos20 = !NULL
+maxFitNDVI = !NULL
+eos20 = !NULL
+eos50 = !NULL
+lsg20 = !NULL
+slopeUp = !NULL
+slopeDown = !NULL
+
+;clrs = ['red','blue','green']
+;for plotting color with latitude
+;make color table for lat
+ctable = COLORTABLE(['red','blue'], NCOLORS = 256, /TRANSPOSE)
+minLat = MIN(x.y)
+maxLat = MAX(x.y)
+
+;hAll = PLOT([JULDAY(10,01,2016),JULDAY(10,15,2017)], [0,0], XTICKFORMAT='(C(CDI,1x,CMoA,1x,CYI2))', $
+;            LAYOUT=[1,3,1], XTITLE='Time', YTITLE='S2 L1C NDVI',DIMENSIONS=[1200,900],/NODATA)
+hAllLeg = !NULL
+;put common wheat first for easy debug
+selected_crops = [selected_crops[3], selected_crops[0:2], selected_crops[4:-1]]
+;for each crop
+FOR i = 0, N_ELEMENTS(selected_crops)-1 DO BEGIN
+  indCrop = WHERE(x.cropname EQ selected_crops[i], countCrop)
+  IF (countCrop EQ 0) THEN STOP
+  ;get the unique IDs of the crop
+  tmp = x.pointID[indCrop]
+  uniqIds = tmp[UNIQ(tmp, SORT(tmp))]
+  PRINT, 'Elements for crop ' + selected_crops[i] + ': ' + STRTRIM(N_ELEMENTS(uniqIds),2)
+  initJk0 = 0
+  initJk1 = 0
+  initJk2 = 0 
+  ;for each single id I have NDVI_mean  VH_mean VV_mean
+  FOR j = 0, N_ELEMENTS(uniqIds)-1 DO BEGIN
+    ;here we have 3 indexes, NDVI_mean  VH_mean VV_mean
+    ;hAllLegk1 = !NULL
+    ;hAllLegk2 = !NULL
+    ;hAllLegk3 = !NULL 
+;    FOR k = 0, N_ELEMENTS(selected_indices)-1 DO BEGIN
+    FOR k = 0, k_sub_max DO BEGIN ;now do it for ndvi only
+      
+;      PRINT, 'remove debug stuff line 102xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+;      u = where(uniqIds eq 55982498) ;29541898
+;      j = u[0]
+;      buffer_plots = 0
+;      k = 0
+;      PRINT, 'remove debug stuff line 102xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+      
+      ;get sub of the id NDVI_mean
+      ind = WHERE((x.pointID EQ uniqIds[j]) AND (x.index_name EQ selected_indices[k]), count)
+      indOfNndviSD = WHERE((x.pointID EQ uniqIds[j]) AND (x.index_name EQ indexSD), count)
+      ;get the date, NDVI, sd at max and area
+      date = x.date[ind]
+      dateJd = YYYYbMMbDD2jd(date)
+      ;order date ascending
+      subAsc = SORT(dateJd)
+      dateJd = dateJd[subAsc]
+      nd = x.index_value[ind]
+      sd = x.index_value[indOfNndviSD]
+      ;maxNDVI = MAX(x.index_value[ind], subMax)
+      ;sdAtMax = x.stddev[ind[subMax]]
+      nd = nd[subAsc]
+      sd =sd[[subAsc]]
+      IF (selected_indices[k] NE 'NDVI_mean') THEN BEGIN
+        ;s1 data, reduce with mean when there are more than one obs per day
+        ;1 get unique jds
+        uniqJDs = dateJd[UNIQ(dateJd, SORT(dateJd))]
+        vjd = FLTARR(N_ELEMENTS(uniqJDs))
+        vnd = FLTARR(N_ELEMENTS(uniqJDs))
+        FOR ujd = 0, N_ELEMENTS(uniqJDs)-1 DO BEGIN
+          vjd[ujd] = uniqJDs[ujd]
+          indUjd = WHERE(dateJd EQ vjd[ujd])
+          vnd[ujd] = MEAN(nd[indUjd], /NAN)
+        ENDFOR
+        dateJd = vjd
+        nd = vnd
+      ENDIF
+      ;now remove possible NaN (important, it may cause troubles later when fitting)
+      indFin = WHERE(FINITE(nd))
+      dateJd = dateJd[indFin]
+      nd = nd[indFin]
+      sd = sd[indFin]
+      area = x.buffer[ind[0]]
+      PRINT, uniqIds[j], ', ',selected_crops[i], ', ', selected_indices[k]
+      ;get the latitude
+      lat = x.y[ind[0]]
+      lon = x.x[ind[0]]
+      ;scale it in order to use it as a subscript of the colortable
+      latSub = ROUND((lat-minLat)/FLOAT(maxLat-minLat)*255)
+      ;make a plot with orginal data (all)
+      tmpTitle = STRTRIM(STRSPLIT(selected_crops[i], '-', /EXTRACT),2)
+      CASE k OF
+        0:BEGIN
+            ;IF (j EQ 0) THEN BEGIN
+            IF (initJk0 EQ 0) THEN BEGIN
+              hAll_k1 = PLOT(dateJd, nd, XTICKFORMAT='(C(CDI,1x,CMoA,1x,CYI2))', NAME=selected_crops[i], COLOR = ctable[*,latSub], TRANSPARENCY= 95, $;LAYOUT=[1,3,i+1], $
+                XTITLE='Time', YTITLE=selected_indices[k],DIMENSIONS=[1200,300], TITLE=tmpTitle[0], BUFFER = buffer_plots, XMINOR=5)
+              initJk0 = 1
+            ENDIF ELSE BEGIN
+              hAll_k1.Select
+              hAll_k1 = PLOT(dateJd, nd, XTICKFORMAT='(C(CDI,1x,CMoA,1x,CYI2))', NAME=selected_crops[i], COLOR = ctable[*,latSub], TRANSPARENCY= 95, /OVERPLOT)
+            ENDELSE
+          END
+        1:BEGIN
+            ;IF (j EQ 0) THEN BEGIN
+            IF (initJk1 EQ 0) THEN BEGIN
+              hAll_k2 = PLOT(dateJd, nd, XTICKFORMAT='(C(CDI,1x,CMoA,1x,CYI2))', NAME=selected_crops[i], COLOR = ctable[*,latSub], TRANSPARENCY= 85, $;LAYOUT=[1,3,i+1], $
+                XTITLE='Time', YTITLE=selected_indices[k],DIMENSIONS=[1200,300], TITLE=tmpTitle[0], BUFFER = buffer_plots, XMINOR=5)
+              initJk1 = 1
+            ENDIF ELSE BEGIN
+              hAll_k2.Select
+              hAll_k2 = PLOT(dateJd, nd, XTICKFORMAT='(C(CDI,1x,CMoA,1x,CYI2))', NAME=selected_crops[i], COLOR = ctable[*,latSub], TRANSPARENCY= 85, /OVERPLOT)
+            ENDELSE
+          END
+        2:BEGIN
+            ;IF (j EQ 0) THEN BEGIN
+            IF (initJk2 EQ 0) THEN BEGIN
+              hAll_k3 = PLOT(dateJd, nd, XTICKFORMAT='(C(CDI,1x,CMoA,1x,CYI2))', NAME=selected_crops[i], COLOR = ctable[*,latSub], TRANSPARENCY= 85, $;LAYOUT=[1,3,i+1], $
+                XTITLE='Time', YTITLE=selected_indices[k],DIMENSIONS=[1200,300], TITLE=tmpTitle[0], BUFFER = buffer_plots, XMINOR=5)
+              initJk2 = 1
+            ENDIF ELSE BEGIN
+              hAll_k3.Select
+              hAll_k3 = PLOT(dateJd, nd, XTICKFORMAT='(C(CDI,1x,CMoA,1x,CYI2))', NAME=selected_crops[i], COLOR = ctable[*,latSub], TRANSPARENCY= 85, /OVERPLOT)
+            ENDELSE
+          END
+        ELSE:STOP
+      ENDCASE
+      
+      IF (extract_pheno EQ 1) THEN BEGIN  
+        IF (selected_indices[k] EQ 'NDVI_mean') THEN BEGIN 
+          h1 = ERRORPLOT(dateJd, nd, sd, XTICKFORMAT='(C(CDI,1x,CMoA,1x,CYI2))', NAME=selected_indices[k], $
+                  TITLE= selected_crops[i] + ', ID ' + STRTRIM(uniqIds[j],2) + ', Lat ' + STRTRIM(ROUND(lat),2), $
+                  LINESTYLE='', SYMBOL='o', YTITLE=selected_indices[k], BUFFER = buffer_plots, DIMENSIONS=[900,300], XMINOR=5, /NODATA)
+          h1 = ERRORPLOT(dateJd, nd, sd, LINESTYLE='', SYMBOL='o', ERRORBAR_COLOR= 'grey', COLOR = 'grey', /OVERPLOT)
+        ENDIF ELSE BEGIN
+          h1 = PLOT(dateJd, nd, XTICKFORMAT='(C(CDI,1x,CMoA,1x,CYI2))', NAME=selected_indices[k], $
+            TITLE= selected_crops[i] + ', ID ' + STRTRIM(uniqIds[j],2) + ', Lat ' + STRTRIM(ROUND(lat),2), $
+            LINESTYLE='', SYMBOL='o', YTITLE=selected_indices[k], BUFFER = buffer_plots, DIMENSIONS=[900,300], XMINOR=5, /NODATA)
+          h1 = PLOT(dateJd, nd, LINESTYLE='', SYMBOL='o', ERRORBAR_COLOR= 'grey', COLOR = 'grey', /OVERPLOT)
+        ENDELSE
+        
+        ;Anton: t = in Julian Dates (ENVI), NDVI should be double and have set values < 0 as noData
+        ;Here I have to set the possible time. Let's try to understand if its summer or winter crop
+        ;Find biggest max in the year of interest (given by Jd range) and the local minima at left and right, assuming that the max has to be located in the period of interest
+        ;= year of interest betwen 1/1 and september 
+        IF use_time_constrains_per_crop EQ 1 THEN BEGIN
+          ;get the limits
+          crop_code = STRSPLIT(selected_crops[i],'-', /EXTRACT)
+          crop_code = STRTRIM(crop_code[-1], 2)
+          indCrop = WHERE(timeRangesPerCrop.Code EQ crop_code, count)
+          IF (count NE 1) THEN STOP
+          DDMMrelY = STRSPLIT(timeRangesPerCrop.Left_min_limit[indCrop], '/', /EXTRACT)
+          lmin = JULDAY(DDMMrelY[1],DDMMrelY[0],2018+FIX(DDMMrelY[2]))
+          DDMMrelY = STRSPLIT(timeRangesPerCrop.Right_min_limit[indCrop], '/', /EXTRACT)
+          rmin = JULDAY(DDMMrelY[1],DDMMrelY[0],2018+FIX(DDMMrelY[2]))
+          DDMMrelY = STRSPLIT(timeRangesPerCrop.Left_max_limit[indCrop], '/', /EXTRACT)
+          lmax = JULDAY(DDMMrelY[1],DDMMrelY[0],2018+FIX(DDMMrelY[2]))
+          DDMMrelY = STRSPLIT(timeRangesPerCrop.Right_max_limit[indCrop], '/', /EXTRACT)
+          rmax = JULDAY(DDMMrelY[1],DDMMrelY[0],2018+FIX(DDMMrelY[2]))
+          season = locate_largest_season_in_jd_range_v2(dateJd, nd, [lmin, rmin], [lmax,rmax], selected_indices[k])
+        ENDIF ELSE BEGIN
+          season = locate_largest_season_in_jd_range_v2(dateJd, nd, [JULDAY(01,01,2018), JULDAY(09,30,2018)], [JULDAY(03,01,2018), JULDAY(07,31,2018)], selected_indices[k])
+        ENDELSE
+        ;treat retrieval `
+        IF (season.retr EQ 1) THEN BEGIN
+          dateRange = [dateJd[season.subLeft],dateJd[season.subRight]];[JULDAY(2,11,2016),JULDAY(2,15,2017)]  ; window range for finding phenology
+          baseDate = JULDAY(01,01,2018)  ; base date for writing info (so 1 = 1 January x)
+          ;pheno = phenoMainDouble(dateJd, nd, 2, dateRange, baseDate) 
+          pheno = phenoFitOverKnownInterval(dateJd, nd, dateRange, dateJd[season.subMax], $
+                                            season.ySmoothAtSubLeft, season.ySmoothAtSubRight, season.ySmoothAtSubMax, season.y_obs_smooth, $
+                                            season.xjdLimP2, season.xjdLimP5, season.xjdFgP2, season.xjdFgP5, baseDate, selected_indices[k])
+          
+          IF (pheno.retr EQ 1) THEN BEGIN
+            ;plot and save only if it was successful
+            dateTmp = INDGEN(pheno.jdInterval[1]-pheno.jdInterval[0])+pheno.jdInterval[0]     ; array with all days (JD) in the modelled year (automatically adapts for shorter years in case year started with decay)
+            fitNDVIseries = TANH_DOUBLE(dateTmp,pheno.PARAM_X) 
+            h1.Select 
+            h2 = PLOT(dateTmp, fitNDVIseries, COLOR = ctable[*,latSub], NAME='DHT fit',/OVERPLOT)
+            h3 = PLOT(baseDate+[pheno.SOS20,pheno.SOS20], [h2.yrange,h2.yrange], COLOR = 'green', NAME='SOS20',/OVERPLOT)
+            h4 = PLOT(baseDate+[pheno.PS90,pheno.PS90], [h2.yrange,h2.yrange], COLOR = 'yellow', NAME='PS90',/OVERPLOT)
+            ;season.subMax
+            h6 = PLOT([dateJd[season.subMax],dateJd[season.subMax]], h2.yrange, COLOR = 'black', LINESTYLE='--', NAME='MaxOfSmooth',/OVERPLOT)
+            xjd_reg = FINDGEN(dateJd[-1]-dateJd[0]+1)+dateJd[0] 
+            h7 = PLOT(xjd_reg, season.y_reg_smooth, COLOR = 'black', NAME='ySmooth',TRANSPARENCY= 70, /OVERPLOT)
+            ;h8 = PLOT(dateJd, season.y_obs_smooth, COLOR = 'black', NAME='ySmooth',LINESTYLE='',SYMBOL='o',TRANSPARENCY= 70, /OVERPLOT)
+            IF FINITE(pheno.EOS20) THEN BEGIN
+              h5 = PLOT(baseDate+[pheno.EOS20,pheno.EOS20], [h2.yrange,h2.yrange], COLOR = 'red', NAME='EOS20',/OVERPLOT)
+              hl = LEGEND(TARGET=[h1,h2,h3,h4,h5,h6,h7], POSITION=[0.32,0.85], LINESTYLE='', TRANSPARENCY = 75)
+            ENDIF ELSE BEGIN
+              hl = LEGEND(TARGET=[h1,h2,h3,h4,h6,h7], POSITION=[0.32,0.85], LINESTYLE='', TRANSPARENCY = 75)
+            ENDELSE
+            indIn = WHERE((dateJd GE pheno.jdInterval[0]) AND (dateJd LE pheno.jdInterval[1]))
+            IF (selected_indices[k] EQ 'NDVI_mean') THEN $
+               hTmp = ERRORPLOT(dateJd[indIn], nd[indIn], sd[indIn], LINESTYLE='',SYMBOL='o', ERRORBAR_COLOR= 'black', COLOR = 'black', /OVERPLOT) $
+              ELSE hTmp = PLOT(dateJd[indIn], nd[indIn], LINESTYLE='',SYMBOL='o', ERRORBAR_COLOR= 'black', COLOR = 'black', /OVERPLOT) 
+            sdAvg = MEAN(sd[indIn])
+            ;for csv and xls, replace NaN with ''
+            tmp = STRJOIN($
+              ;['CROP_TYPE','ID','Area','SD@MaxNDVI','SOS20','EOS20','maxFitNDVI',
+              [selected_indices[k], selected_crops[i], STRTRIM([uniqIds[j], area, lat, lon, pheno.SOS20, pheno.EOS20, pheno.LGS20, pheno.SOS50, pheno.EOS50, pheno.LGS50, pheno.maxNDVI,  $
+              ;'LSG20','Slope_growth','Slope_decay','r_fir','RMSD_fit','nImages','maxGap']) $
+              pheno.PARAM_x[3], pheno.PARAM_x[6], pheno.PearsonCC, pheno.RMSD, pheno.nImages, pheno.maxGap, sdAvg, pheno.PARAM_X, pheno.PCERROR],2),STRTRIM(season.code,2),season.msg] $
+              +dlmtr)
+            tmp = tmp.Replace('NaN','')
+            PRINTF, lun, tmp  
+            cro_type= [cro_type, selected_crops[i]]
+            sos20 = [sos20,pheno.SOS20]
+            maxFitNDVI = [maxFitNDVI, pheno.maxNDVI]
+            eos20 = [eos20, pheno.EOS20]
+            eos50 = [eos50, pheno.eos50]
+            lsg20 = [lsg20,  pheno.LGS20]
+            slopeUp = [slopeUp,pheno.PARAM_x[3]]
+            slopeDown = [slopeDown, pheno.PARAM_x[6]]
+          ENDIF ELSE BEGIN ;pheno failed 
+            PRINTF, lunFail, selected_indices[k] + ',' + selected_crops[i] + ', ID ' + STRTRIM(uniqIds[j],2) + ', fit failed: ' + pheno.message
+            pheno = 0
+          ENDELSE
+        ENDIF ELSE BEGIN ;locate_largest_season_in_jd_range failed 
+          PRINTF, lunFail, selected_indices[k] + ',' + selected_crops[i] + ', ID ' + STRTRIM(uniqIds[j],2) + ', LocateSeason failed: ' + season.msg
+          season = 0
+        ENDELSE
+        h1.save, dir_out + '\fit_' + selected_crops[i] + '_ID_' + STRTRIM(uniqIds[j],2)+'_'+selected_indices[k]+'.png'
+        h1.close
+        pheno = 0
+      ENDIF ;extract_pheno
+    ENDFOR  ;k 
+  ENDFOR ;j
+  ;PRINT, 'debug'
+  FOR k = 0, k_sub_max DO BEGIN
+    CASE k OF
+      0:BEGIN
+        hAll_k1.Select
+        hAll_k1.YRANGE = [-0.2,1]
+        cbar = COLORBAR(RGB_TABLE=ctable, ORIENTATION = 1, RANGE=[minLat,maxLat], TITLE='Latitude N (deg)',FONT_SIZE=fs,TAPER=1,POSITION = [0.97, 0.2, 0.99, 0.8])
+        hAll_k1.save, dir_out + '\All_input_data_'+selected_crops[i]+'_'+selected_indices[k]+'.png'
+        hAll_k1.close
+      END
+      1:BEGIN
+        hAll_k2.Select
+        cbar = COLORBAR(RGB_TABLE=ctable, ORIENTATION = 1, RANGE=[minLat,maxLat], TITLE='Latitude N (deg)',FONT_SIZE=fs,TAPER=1,POSITION = [0.97, 0.2, 0.99, 0.8])
+        hAll_k2.save, dir_out + '\All_input_data_'+selected_crops[i]+'_'+selected_indices[k]+'.png'
+        hAll_k2.close
+      END
+      2:BEGIN
+        hAll_k3.Select
+        cbar = COLORBAR(RGB_TABLE=ctable, ORIENTATION = 1, RANGE=[minLat,maxLat], TITLE='Latitude N (deg)',FONT_SIZE=fs,TAPER=1,POSITION = [0.97, 0.2, 0.99, 0.8])
+        hAll_k3.save, dir_out + '\All_input_data_'+selected_crops[i]+'_'+selected_indices[k]+'.png'
+        hAll_k3.close
+      END
+      ELSE:STOP
+    ENDCASE
+  ENDFOR  
+ENDFOR  ;i
+IF (extract_pheno EQ 1) THEN BEGIN
+  SAVE, /ALL, FILENAME = dir_out + '\pheno_run.sav'
+  FREE_LUN, lun
+  FREE_LUN, lunFail
+ENDIF
+PRINT, 'Ended'
+END

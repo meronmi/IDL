@@ -1,6 +1,9 @@
 PRO A_make_pheno_scatter_plot_by_gaul0_or_1_by_modality_sin_cos
-gaul_level = 0;1 ;can be gaul 0 or 1 
+gaul_level = 1;1 ;can be gaul 0 or 1 
 saveSineCos4cluster = 1
+
+base_dir = '\\ies\d5\foodsec\Users\dimouma\trainee'
+
 CASE gaul_level OF
   0: BEGIN
       fn_units = '\\ies\h04\Foodsec\users\trainee\DensScatPlot\Input\gaul0_asap.img'
@@ -8,18 +11,25 @@ CASE gaul_level OF
       FILE_MKDIR, out_dir
     END
   1: BEGIN
-      fn_units = '\\ies\h04\Foodsec\users\trainee\DensScatPlot\Input\gaul1_asap.img'
-      out_dir = '\\ies\h04\Foodsec\users\trainee\DensScatPlot\out_gaul1
+      ;fn_units = '\\ies\h04\Foodsec\users\trainee\DensScatPlot\Input\gaul1_asap.img'
+      fn_units = base_dir + '\DensScatPlot\Input\ASAP4\gaul' + STRTRIM(gaul_level,2) + '_asap.img' ;0 or 1
+      ;out_dir = '\\ies\h04\Foodsec\users\trainee\DensScatPlot\out_gaul1
+      out_dir = base_dir + '\DensScatPlot\ASAP4_out_gaul' + STRTRIM(gaul_level,2)
       FILE_MKDIR, out_dir
     END
   ELSE: STOP
 ENDCASE
-fn_sos = ['\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\crop_masked_pheno1-36\cropAfiGT25_phenos1_1_36.img', $
-          '\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\crop_masked_pheno1-36\cropAfiGT25_phenos2_1_36.img']
-fn_eos = ['\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\crop_masked_pheno1-36\cropAfiGT25_phenoe1_1_36.img', $
-          '\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\crop_masked_pheno1-36\cropAfiGT25_phenoe2_1_36.img']
-fn_table = '\\ies\h04\Foodsec\users\trainee\DensScatPlot\Input\gaul1_asap_analyzed_3.csv'
 
+;fn_sos = ['\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\crop_masked_pheno1-36\cropAfiGT25_phenos1_1_36.img', $
+;          '\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\crop_masked_pheno1-36\cropAfiGT25_phenos2_1_36.img']
+;fn_eos = ['\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\crop_masked_pheno1-36\cropAfiGT25_phenoe1_1_36.img', $
+;          '\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\crop_masked_pheno1-36\cropAfiGT25_phenoe2_1_36.img']
+;fn_table = '\\ies\h04\Foodsec\users\trainee\DensScatPlot\Input\gaul1_asap_analyzed_3.csv'
+fn_sos = base_dir + ['\Pheno_asap4\pheno1-36\phenos1_1_36.img', $
+  '\Pheno_asap4\pheno1-36\phenos2_1_36.img']
+fn_eos = base_dir + ['\Pheno_asap4\pheno1-36\phenoe1_1_36.img', $
+  '\Pheno_asap4\pheno1-36\phenoe2_1_36.img']
+fn_table = base_dir + '\4CALENDAR_asap4\asap4level1_chad_RDC.csv'
 
 ;read table with units id and admin name
 table = READ_CSV(fn_table, HEADER=hdr)
@@ -100,7 +110,7 @@ FOR i = 0, N_ELEMENTS(idList)-1 DO BEGIN
     DensityAndFit_log_scale, dataSos, dataEos,'crop SOS (dek)', 'crop EOS (dek)', out_dir, [1,36], [1,36], 36, 30, $
       TITLE = 'ALL MOD, asapID' + STRTRIM(id01, 2) + ', n=' + STRTRIM(N_ELEMENTS(dataSos),2) + ', ' + STRTRIM(ROUND(count2/FLOAT(count1)*100),2) + '% is bimodal', $ 
       FILESUFFIX =  strName + '_ID' + STRTRIM(id01, 2) + '_ALL_MODALITIES', DOFIT=0, NOWIN = 0, RGBTAB = 4, SIMPLE = 1, $
-      RANGEINLOW = 1, RANGEOUT = rout, SAVECSV = 1, TOTALN = count1; 72 ;file:///C:/Program Files/Exelis/IDL85/help/online_help/IDL/Content/LoadingDefaultColorTables.htm
+      RANGEINLOW = 1, RANGEOUT = rout, SAVECSV = 1, TOTALN = count1, DEK36PLOT=1; 72 ;file:///C:/Program Files/Exelis/IDL85/help/online_help/IDL/Content/LoadingDefaultColorTables.htm
 
     ;new part for producing 3 graphs
 
@@ -122,7 +132,7 @@ FOR i = 0, N_ELEMENTS(idList)-1 DO BEGIN
       DensityAndFit_log_scale, dataSos, dataEos,'crop SOS (dek)', 'crop EOS (dek)', out_dir, [1,36], [1,36], 36, 30, $
         TITLE = 'BI-MOD, asapID' + STRTRIM(id01, 2) + ', n=' + STRTRIM(N_ELEMENTS(dataSos),2) + ', ' + STRTRIM(ROUND(count2/FLOAT(count1)*100),2) + '% is bimodal', $ 
         FILESUFFIX =  strName  + '_ID' + STRTRIM(id01, 2) + '_ONLY_BIMODAL', DOFIT=0, NOWIN = 0, RGBTAB = 4, SIMPLE = 1, $
-        RANGE_IN = rout, SAVECSV = 1, TOTALN = count1; 72 ;file:///C:/Program Files/Exelis/IDL85/help/online_help/IDL/Content/LoadingDefaultColorTables.htm
+        RANGE_IN = rout, SAVECSV = 1, TOTALN = count1, DEK36PLOT=1; 72 ;file:///C:/Program Files/Exelis/IDL85/help/online_help/IDL/Content/LoadingDefaultColorTables.htm
       DELVAR, dataSos, dataEos
     ENDIF
     ;only monomodal
@@ -148,7 +158,7 @@ FOR i = 0, N_ELEMENTS(idList)-1 DO BEGIN
       DensityAndFit_log_scale, dataSos, dataEos,'crop SOS (dek)', 'crop EOS (dek)', out_dir, [1,36], [1,36], 36, 30, $
         TITLE = 'MONO-MOD, asapID' + STRTRIM(id01, 2) + ', n=' + STRTRIM(N_ELEMENTS(dataSos),2) + ', ' + STRTRIM(ROUND(count2/FLOAT(count1)*100),2) + '% is bimodal', $ 
         FILESUFFIX =  strName + '_ID' + STRTRIM(id01, 2) + '_ONLY_MONOMODAL', DOFIT=0, NOWIN = 0, RGBTAB = 4, SIMPLE = 1, $
-        RANGE_IN = rout, SAVECSV = 1, TOTALN = count1
+        RANGE_IN = rout, SAVECSV = 1, TOTALN = count1, DEK36PLOT=1
     ENDIF
     tmpSos = 0
     dataSos = 0

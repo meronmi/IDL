@@ -1,4 +1,10 @@
 18/09/2018
-use A_make_pheno_scatter_plot_by_gaul0_or_1_by_modality_sin_cos.pro that can deal with gaul0 and gaul1.
+use A_make_pheno_scatter_plot_by_gaul0_or_1_by_modality_sin_cos.pro that can deal with gaul0 and gaul1. NOTE THAT IT REQUIRES pheno to be
+thresholded by afi GT 25%
+
 For some reson the axis titles wre all black when buffering the scatterplot. I disabled the buffering and added a .close at the end 
 of the density scatter function  (on my desktop, not on server)
+
+Use:
+A_make_pheno_scatter_plot_by_gaul0_or_1_by_modality_sin_cos_afiLoad.pro that makes as above but consider only the afi GT 25%
+AA_make_pheno_scatter_plot_by_gaul0_or_1_by_modality_by_AFI_sin_cos.pro to compute the area (takes afi and actual pixel size into account)

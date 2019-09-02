@@ -1,13 +1,3 @@
-Function mean_vec, array_deg
-  rad=!DTOR*double(array_deg)
-  ve=-mean(sin(rad), /DOUBLE, /NAN)
-  vn=-mean(cos(rad), /DOUBLE, /NAN)
-  mv=DOUBLE(ATAN(ve, vn))  
-  IF mv LT 180.0d * 1.0d / !DTOR then mv=mv * !RADEG+180.0d
-  IF mv GT 180.0d * 1.0d / !DTOR then mv=mv * !RADEG-180.0d
-  return, mv
-End
-
 Function avg_dec, array_dec
   ;return Nan if they are all Nan
   ind=WHERE(FINITE(array_dec) EQ 1, count_finite)

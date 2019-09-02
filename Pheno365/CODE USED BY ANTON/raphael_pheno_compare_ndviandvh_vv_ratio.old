@@ -1,0 +1,305 @@
+PRo Raphael_pheno_compare_NDVIandVH_VV_ratio
+
+dir =  'D:\RAPHAEL_pheno_test\RESULTS'
+dir_out = dir + '\Pheno_from_index_corr'
+FILE_MKDIR, dir_out
+csv_file = dir + '\pheno_results.csv'
+res = READ_CSV(csv_file, HEADER=hdr, MISSING_VALUE=!VALUES.F_NAN )
+x = rename_tags(res, TAG_NAMES(res), [hdr[0:-2],'Empty'])
+PRINT, hdr
+cropTypes = x.crop_type[UNIQ(x.crop_type,SORT(x.crop_type))]
+indices = x.index[UNIQ(x.index,SORT(x.index))]
+h1_array = !NULL
+
+;make the table for all crops
+OPENW, lun, dir_out + '\Pheno_from_index_corr.csv', /GET_LUN
+dlmtr = ','
+PRINTF, lun, STRJOIN(['Crop','Sampling','n','SOS20_r','SOS20_P','SOS20_RMSD','SOS20_MAE','SOS20_ME',$
+                                            'EOS20_r','EOS20_P','EOS20_RMSD','EOS20_MAE','EOS20_ME',$
+                                            'GSL20_r','GSL20_P','GSL20_RMSD','GSL20_MAE','GSL20_ME',$
+                                            'SOS50_r','SOS50_P','SOS50_RMSD','SOS50_MAE','SOS50_ME',$
+                                            'EOS50_r','EOS50_P','EOS50_RMSD','EOS50_MAE','EOS50_ME',$
+                                            'GSL50_r','GSL50_P','GSL50_RMSD','GSL50_MAE','GSL50_ME'], dlmtr)
+FOR u = 0, 2 DO BEGIN ;all data, only selected based on gaps and perror
+  FOR i = 0, N_ELEMENTS(cropTypes)-1 DO BEGIN
+    tmp = STRSPLIT(cropTypes[i],'-',/EXTRACT)
+    tmp = STRMID(STRTRIM(tmp[0],2),0,18)
+    CASE u OF
+      0: BEGIN
+        indND = WHERE((x.index EQ 'NDVI_mean') AND (x.crop_type EQ cropTypes[i]))
+        indVHVV = WHERE((x.index EQ 'VH_VV_ratio') AND (x.crop_type EQ cropTypes[i]))
+        samp = 'All data'
+        ;prefix = indices[k]
+      END
+      1: BEGIN
+        indND = WHERE((x.index EQ 'NDVI_mean') AND $
+          (x.crop_type EQ cropTypes[i]) AND $
+          (x.maxGap LT 30) AND $
+          (x.p2_err LT 30) AND $
+          (x.p2_err NE 0) AND $
+          (x.p5_err LT 30) AND $
+          (x.p5_err NE 0))
+        indVHVV = WHERE((x.index EQ 'VH_VV_ratio') AND $
+          (x.crop_type EQ cropTypes[i]) AND $
+          (x.maxGap LT 30) AND $
+          (x.p2_err LT 30) AND $
+          (x.p2_err NE 0) AND $
+          (x.p5_err LT 30) AND $
+          (x.p5_err NE 0))
+        samp = 'highQ_data'
+      END
+      2: BEGIN
+        ind = WHERE(x.crop_type EQ cropTypes[i])
+        sd = x.NDVI_SD_in_season[ind]
+        percSD = percentiles(sd, value=0.90)
+        indND = WHERE((x.index EQ 'NDVI_mean') AND $
+          (x.crop_type EQ cropTypes[i]) AND $
+          (x.maxGap LT 30) AND $
+          (x.p2_err LT 30) AND $
+          (x.p2_err NE 0) AND $
+          (x.p5_err LT 30) AND $
+          (x.p5_err NE 0) AND $
+          (x.NDVI_SD_in_season LE percSD))
+        indVHVV = WHERE((x.index EQ 'VH_VV_ratio') AND $
+          (x.crop_type EQ cropTypes[i]) AND $
+          (x.maxGap LT 30) AND $
+          (x.p2_err LT 30) AND $
+          (x.p2_err NE 0) AND $
+          (x.p5_err LT 30) AND $
+          (x.p5_err NE 0))
+          samp = 'highQ_data_SD90perc'
+      END
+    ENDCASE
+    ;now I have to match them so that they point to the same samples
+    idND = x.ID[indND]
+    idVHVV = x.ID[indVHVV]
+    MATCH, idND, idVHVV, subND, subVHVV
+    indND = indND[subND]
+    indVHVV = indVHVV[subVHVV]
+    IF (N_ELEMENTS(indND) NE N_ELEMENTS(indVHVV)) THEN STOP
+    n = STRTRIM(N_ELEMENTS(indND),2)
+    
+    strArrOut = [cropTypes[i],samp,n]
+    xx = x.SOS20[indND]
+    yy = x.SOS20[indVHVV]
+    res = linregstat(xx, yy)
+    r = 'n.a' & p = 'n.a' 
+    IF (FINITE(res[3]) EQ 1) THEN BEGIN
+      r = STRTRIM(res[2],2)
+      p = STRTRIM(res[3],2)
+      ;error_stats, x0, y0
+      
+      ;indfin = WHERE((FINITE(xx) EQ 1) AND (FINITE(yy) EQ 1), countFin)
+      ;rmsd = STRTRIM(SQRT(TOTAL((yy[indfin]-xx[indfin])^2)/FLOAT(countFin)),2)
+    ENDIF 
+    es = ''
+    es = error_stats(xx, yy)
+    strArrOut = [strArrOut, r, p, STRTRIM(es.rmsd,2), STRTRIM(es.mae,2), STRTRIM(es.me,2)]
+    
+    xx = x.EOS20[indND]
+    yy = x.EOS20[indVHVV]
+    res = linregstat(xx, yy)
+    r = 'n.a' & p = 'n.a' 
+    IF (FINITE(res[3]) EQ 1) THEN BEGIN
+      r = STRTRIM(res[2],2)
+      p = STRTRIM(res[3],2)
+;      indfin = WHERE((FINITE(xx) EQ 1) AND (FINITE(yy) EQ 1), countFin)
+;      rmsd = STRTRIM(SQRT(TOTAL((yy[indfin]-xx[indfin])^2)/FLOAT(countFin)),2)
+    ENDIF
+    es = ''
+    es = error_stats(xx, yy)
+    strArrOut = [strArrOut, r, p, STRTRIM(es.rmsd,2), STRTRIM(es.mae,2), STRTRIM(es.me,2)]
+    
+    xx = x.LSG20[indND]
+    yy = x.LSG20[indVHVV]
+    res = linregstat(xx, yy)
+    r = 'n.a' & p = 'n.a' 
+    IF (FINITE(res[3]) EQ 1) THEN BEGIN
+      r = STRTRIM(res[2],2)
+      p = STRTRIM(res[3],2)
+;      indfin = WHERE((FINITE(xx) EQ 1) AND (FINITE(yy) EQ 1), countFin)
+;      rmsd = STRTRIM(SQRT(TOTAL((yy[indfin]-xx[indfin])^2)/FLOAT(countFin)),2)
+    ENDIF
+    es = ''
+    es = error_stats(xx, yy)
+    strArrOut = [strArrOut, r, p, STRTRIM(es.rmsd,2), STRTRIM(es.mae,2), STRTRIM(es.me,2)]
+    
+    xx = x.SOS50[indND]
+    yy = x.SOS50[indVHVV]
+    res = linregstat(xx, yy)
+    r = 'n.a' & p = 'n.a' 
+    IF (FINITE(res[3]) EQ 1) THEN BEGIN
+      r = STRTRIM(res[2],2)
+      p = STRTRIM(res[3],2)
+;      indfin = WHERE((FINITE(xx) EQ 1) AND (FINITE(yy) EQ 1), countFin)
+;      rmsd = STRTRIM(SQRT(TOTAL((yy[indfin]-xx[indfin])^2)/FLOAT(countFin)),2)
+    ENDIF
+    es = ''
+    es = error_stats(xx, yy)
+    strArrOut = [strArrOut, r, p, STRTRIM(es.rmsd,2), STRTRIM(es.mae,2), STRTRIM(es.me,2)]
+    
+    xx = x.EOS50[indND]
+    yy = x.EOS50[indVHVV]
+    res = linregstat(xx, yy)
+    r = 'n.a' & p = 'n.a' 
+    IF (FINITE(res[3]) EQ 1) THEN BEGIN
+      r = STRTRIM(res[2],2)
+      p = STRTRIM(res[3],2)
+;      indfin = WHERE((FINITE(xx) EQ 1) AND (FINITE(yy) EQ 1), countFin)
+;      rmsd = STRTRIM(SQRT(TOTAL((yy[indfin]-xx[indfin])^2)/FLOAT(countFin)),2)
+    ENDIF
+    es = ''
+    es = error_stats(xx, yy)
+    strArrOut = [strArrOut, r, p, STRTRIM(es.rmsd,2), STRTRIM(es.mae,2), STRTRIM(es.me,2)]
+    
+    xx = x.LSG50[indND]
+    yy = x.LSG50[indVHVV]
+    res = linregstat(xx, yy)
+    r = 'n.a' & p = 'n.a' 
+    IF (FINITE(res[3]) EQ 1) THEN BEGIN
+      r = STRTRIM(res[2],2)
+      p = STRTRIM(res[3],2)
+;      indfin = WHERE((FINITE(xx) EQ 1) AND (FINITE(yy) EQ 1), countFin)
+;      rmsd = STRTRIM(SQRT(TOTAL((yy[indfin]-xx[indfin])^2)/FLOAT(countFin)),2)
+    ENDIF
+    es = ''
+    es = error_stats(xx, yy)
+    strArrOut = [strArrOut, r, p, STRTRIM(es.rmsd,2), STRTRIM(es.mae,2), STRTRIM(es.me,2)]
+    
+    PRINTF, lun, STRJOIN(strArrOut, dlmtr)
+  ENDFOR ; i crop type
+ENDFOR  ;u
+FREE_LUN, lun
+
+;*************************************************************
+;make the plots for the big crops
+n_biggest_to_select = 8
+n_per_crop_type = INTARR(N_ELEMENTS(cropTypes))
+FOR i = 0, N_ELEMENTS(cropTypes)-1 DO BEGIN
+  ind = WHERE(x.crop_type EQ cropTypes[i], count)
+  n_per_crop_type[i] = count
+ENDFOR
+sub = REVERSE(SORT(n_per_crop_type))
+bigCropTypes = cropTypes[sub[0:n_biggest_to_select-1]]
+
+FOR u = 0, 2 DO BEGIN ;all data, only selected based on gaps and perror
+  FOR i = 0, N_ELEMENTS(bigCropTypes)-1 DO BEGIN
+    tmp = STRSPLIT(bigCropTypes[i],'-',/EXTRACT)
+    tmp = STRMID(STRTRIM(tmp[0],2),0,18)
+    CASE u OF
+      0: BEGIN
+        indND = WHERE((x.index EQ 'NDVI_mean') AND (x.crop_type EQ bigCropTypes[i]))
+        indVHVV = WHERE((x.index EQ 'VH_VV_ratio') AND (x.crop_type EQ bigCropTypes[i]))
+        tit = tmp + ', Pheno NDVI vs. VH/VV' 
+        tit2 = 'All data, n='  
+        suffix = 'all_data'
+        ;prefix = indices[k]
+      END
+      1: BEGIN
+        indND = WHERE((x.index EQ 'NDVI_mean') AND $
+                      (x.crop_type EQ bigCropTypes[i]) AND $
+                      (x.maxGap LT 30) AND $
+                      (x.p2_err LT 30) AND $
+                      (x.p2_err NE 0) AND $
+                      (x.p5_err LT 30) AND $
+                      (x.p5_err NE 0))
+        indVHVV = WHERE((x.index EQ 'VH_VV_ratio') AND $
+                      (x.crop_type EQ bigCropTypes[i]) AND $
+                      (x.maxGap LT 30) AND $
+                      (x.p2_err LT 30) AND $
+                      (x.p2_err NE 0) AND $
+                      (x.p5_err LT 30) AND $
+                      (x.p5_err NE 0))
+        tit = tmp + ', Pheno NDVI vs. VH/VV'  
+        tit2 = 'maxGap, p2err, p5err <30; p2err, p5err !=0, n='  
+        suffix = 'highQ_data'
+        ;prefix = indices[k]
+      END
+      2: BEGIN
+        ind = WHERE(x.crop_type EQ bigCropTypes[i])
+        sd = x.NDVI_SD_in_season[ind]
+        percSD = percentiles(sd, value=0.90)
+        indND = WHERE((x.index EQ 'NDVI_mean') AND $
+                    (x.crop_type EQ bigCropTypes[i]) AND $
+                    (x.maxGap LT 30) AND $
+                    (x.p2_err LT 30) AND $
+                    (x.p2_err NE 0) AND $
+                    (x.p5_err LT 30) AND $
+                    (x.p5_err NE 0) AND $
+                    (x.NDVI_SD_in_season LE percSD))
+        indVHVV = WHERE((x.index EQ 'VH_VV_ratio') AND $
+                    (x.crop_type EQ bigCropTypes[i]) AND $
+                    (x.maxGap LT 30) AND $
+                    (x.p2_err LT 30) AND $
+                    (x.p2_err NE 0) AND $
+                    (x.p5_err LT 30) AND $
+                    (x.p5_err NE 0))
+        tit = tmp + ', Pheno NDVI vs. VH/VV' 
+        tit2 = 'maxGap, NDVIsd<90perc, (p2err, p5err) <30 && !=0, n='
+        suffix = 'highQ_data_SD90perc'
+        ;prefix = indices[k]
+      END
+    ENDCASE
+    ;now I have to match them so that they point to the same samples
+    idND = x.ID[indND]
+    idVHVV = x.ID[indVHVV]
+    MATCH, idND, idVHVV, subND, subVHVV
+    indND = indND[subND]
+    indVHVV = indVHVV[subVHVV]
+    tit2 = tit2 + STRTRIM(N_ELEMENTS(indND),2)
+    ;Plot
+    symb = '.'
+    ;left plot of 20% SOS, EOS, LGS     
+    res = linregstat(x.SOS20[indND], x.SOS20[indVHVV])
+    mrg = [0.2,0,0.1,0.25]
+    h1 = PLOT(x.SOS20[indND], x.SOS20[indVHVV], XTITLE='ND SOS20', YTITLE='VH/VV SOS20', LINESTYLE='', SYMBOL=symb, MARGIN = mrg, LAYOUT=[2,3,1], DIMENSIONS=[800,800])
+    ;[offset, gain, corr, pgain]
+    h1b = PLOT(h1.XRANGE, res[0]+res[1]*h1.XRANGE, COLOR='b', /OVERPLOT)
+    hll = PLOT([0,0],[0,0], TITLE ='r='+STRING(res[2],FORMAT='(F6.3)')+', P='+STRING(res[3],FORMAT='(F6.3)'), COLOR='b',/OVERPLOT,/NODATA)
+    hll.TITLE.FONT_COLOR='b' & hll.TITLE.FONT_SIZE=10
+    
+    res = linregstat(x.EOS20[indND], x.EOS20[indVHVV])
+    mrg = [0.2,0.1,0.1,0.25]
+    h1 = PLOT(x.EOS20[indND], x.EOS20[indVHVV], XTITLE='ND EOS20', YTITLE='VH/VV EOS20', LINESTYLE='', SYMBOL=symb, MARGIN = mrg, LAYOUT=[2,3,3], /CURRENT)
+    h1b = PLOT(h1.XRANGE, res[0]+res[1]*h1.XRANGE, COLOR='b', /OVERPLOT)
+    hll = PLOT([0,0],[0,0], TITLE ='r='+STRING(res[2],FORMAT='(F6.3)')+', P='+STRING(res[3],FORMAT='(F6.3)'), COLOR='b',/OVERPLOT,/NODATA)
+    hll.TITLE.FONT_COLOR='b' & hll.TITLE.FONT_SIZE=10
+      
+    res = linregstat(x.LSG20[indND], x.LSG20[indVHVV])
+    mrg = [0.2,0.2,0.1,0.15]
+    h1 = PLOT(x.LSG20[indND], x.LSG20[indVHVV], XTITLE='ND LSG20', YTITLE='VH/VV LSG20', LINESTYLE='', SYMBOL=symb, MARGIN = mrg, LAYOUT=[2,3,5], /CURRENT)
+    h1b = PLOT(h1.XRANGE, res[0]+res[1]*h1.XRANGE, COLOR='b', /OVERPLOT)
+    hll = PLOT([0,0],[0,0], TITLE ='r='+STRING(res[2],FORMAT='(F6.3)')+', P='+STRING(res[3],FORMAT='(F6.3)'), COLOR='b',/OVERPLOT,/NODATA)
+    hll.TITLE.FONT_COLOR='b' & hll.TITLE.FONT_SIZE=10
+    
+    ;right plot of 50% SOS, EOS, LGS      
+    res = linregstat(x.SOS50[indND], x.SOS50[indVHVV])
+    mrg = [0.2,0,0.1,0.25]
+    h1 = PLOT(x.SOS50[indND], x.SOS50[indVHVV], XTITLE='ND SOS50', YTITLE='VH/VV SOS50', LINESTYLE='', SYMBOL=symb, MARGIN = mrg, LAYOUT=[2,3,2], /CURRENT)
+    ;[offset, gain, corr, pgain]
+    h1b = PLOT(h1.XRANGE, res[0]+res[1]*h1.XRANGE, COLOR='b', /OVERPLOT)
+    hll = PLOT([0,0],[0,0], TITLE ='r='+STRING(res[2],FORMAT='(F6.3)')+', P='+STRING(res[3],FORMAT='(F6.3)'), COLOR='b',/OVERPLOT,/NODATA)
+    hll.TITLE.FONT_COLOR='b' & hll.TITLE.FONT_SIZE=10
+    
+    res = linregstat(x.EOS50[indND], x.EOS50[indVHVV])
+    mrg = [0.2,0.1,0.1,0.25]
+    h1 = PLOT(x.EOS50[indND], x.EOS50[indVHVV], XTITLE='ND EOS50', YTITLE='VH/VV EOS50', LINESTYLE='', SYMBOL=symb, MARGIN = mrg, LAYOUT=[2,3,4], /CURRENT)
+    h1b = PLOT(h1.XRANGE, res[0]+res[1]*h1.XRANGE, COLOR='b', /OVERPLOT)
+    hll = PLOT([0,0],[0,0], TITLE ='r='+STRING(res[2],FORMAT='(F6.3)')+', P='+STRING(res[3],FORMAT='(F6.3)'), COLOR='b',/OVERPLOT,/NODATA)
+    hll.TITLE.FONT_COLOR='b' & hll.TITLE.FONT_SIZE=10
+    
+    res = linregstat(x.LSG50[indND], x.LSG50[indVHVV])
+    mrg = [0.2,0.2,0.1,0.15]
+    h1 = PLOT(x.LSG50[indND], x.LSG50[indVHVV], XTITLE='ND LSG50', YTITLE='VH/VV LSG50', LINESTYLE='', SYMBOL=symb, MARGIN = mrg, LAYOUT=[2,3,6], /CURRENT)
+    h1b = PLOT(h1.XRANGE, res[0]+res[1]*h1.XRANGE, COLOR='b', /OVERPLOT)
+    hll = PLOT([0,0],[0,0], TITLE ='r='+STRING(res[2],FORMAT='(F6.3)')+', P='+STRING(res[3],FORMAT='(F6.3)'), COLOR='b',/OVERPLOT,/NODATA)
+    hll.TITLE.FONT_COLOR='b' & hll.TITLE.FONT_SIZE=10
+    
+    ht = TEXT(0.5,0.975,tit, ALIGNMENT=0.5,FONT_SIZE= 16)
+    ht = TEXT(0.5,0.95,tit2, ALIGNMENT=0.5,FONT_SIZE= 14)
+     
+    h1.save, dir_out + '\' + tmp + '_ND_VHVV_pheno_corr_' + suffix + '.png'
+    h1.close
+  ENDFOR ; i crop type
+ENDFOR  ;u
+END

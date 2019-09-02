@@ -1,13 +1,35 @@
-PRO C_check_pheno
+PRO C_check_pheno, all_in_a_STRUCTURE = all_in_a_STRUCTURE
 save_output = 1
-dir_pheno_def, dir_PHENOdef, dir_lta, phenoDefFullPath, phenoDirOut, merged_fixed_dir, target_area_fn, cm_fn, prefix, suffix, dateformat, runVersion
+IF KEYWORD_SET(all_in_a_STRUCTURE) EQ 1 THEN BEGIN
+  ;"decompress" the big structure if it was sent here
+  runVersion = all_in_a_STRUCTURE.runVersion
+  prefix = all_in_a_STRUCTURE.prefix
+  suffix = all_in_a_STRUCTURE.suffix
+  dateformat = all_in_a_STRUCTURE.dateformat
+  dir_lta = all_in_a_STRUCTURE.dir_lta
+  dir_PHENOdef = all_in_a_STRUCTURE.dir_PHENOdef
+  ;New thresholds 0.25-0.35
+  phenoDefFullPath = all_in_a_STRUCTURE.phenoDefFullPath
+  base_dir_pheno_out =  all_in_a_STRUCTURE. base_dir_pheno_out
+  phenoDirOut = all_in_a_STRUCTURE.phenoDirOut
+  merged_fixed_dir = all_in_a_STRUCTURE.merged_fixed_dir
+  target_area_fn = all_in_a_STRUCTURE.target_area_fn
+  cm_fn = all_in_a_STRUCTURE.cm_fn
+  devDir = all_in_a_STRUCTURE.devDir
+ENDIF ELSE BEGIN
+  dir_pheno_def, dir_PHENOdef, dir_lta, phenoDefFullPath, phenoDirOut, merged_fixed_dir, target_area_fn, cm_fn, prefix, suffix, dateformat, runVersion, devDir
+ENDELSE
 ;dir_pheno_def_vgt_old, dir_PHENOdef, dir_lta, phenoDefFullPath, phenoDirOut, merged_fixed_dir, target_area_fn, cm_fn
 dir = phenoDirOut.dir_out + '\Filtered_seasonality'
 ;dir = 'Y:\remote_sensing\vgt\Pheno_Oct_2016\PhenoV2\test'
 fn_pheno_check = 'pheno_check'
 ;fn_pheno_check = 'pheno_check_v2'
-ns = 40320
-nl = 14673
+;ns = 40320
+;nl = 14673
+fn_hdr = FILE_SEARCH(dir_lta+'\*.hdr')
+fn_hdr = fn_hdr[0]
+ns = read_info('samples', fn_hdr)
+nl = read_info('lines', fn_hdr)
 
 season = ['1','2']
 ;prefix = 'vt'
@@ -123,7 +145,7 @@ FOR i = 0, ns - 1 DO BEGIN
     res[i,j,-1] = MAX(res[i,j,*])
   ENDFOR
 ENDFOR
-IF (save_output) THEN BEGIN
+IF (save_output EQ 1) THEN BEGIN
   OPENW, lun, dir + '\' + fn_pheno_check + '.img', /GET_LUN
   WRITEU, lun, res
   FREE_LUN, lun
@@ -133,12 +155,16 @@ IF (save_output) THEN BEGIN
   PRINTF, lun, '5 sos2 GE eos2, 6 sen2 GT eos2, 7 max2_not_in_sos2-sen2, 8 sen is present but sos no, 9 sos present but sen no, 9any_problem}'
   FREE_LUN, lun
 ENDIF
+OPENW, lun, dir + '\' + 'check_errors.txt', /GET_LUN
 FOR i = 0, nb-1 DO BEGIN
   ;PRINT, i
   ind = WHERE(res[*,*,i] GT 0, count)
   PRINT, strtrim(i,2)  + '- ' + string_out[i] + ', n pix with 1: ' + STRTRIM(count,2)
+  PRINTF, lun, strtrim(i,2)  + '- ' + string_out[i] + ', n pix with 1: ' + STRTRIM(count,2)
 ENDFOR
+FREE_LUN, lun
 ind = WHERE(res[*,*,-1] GT 0, count)
+;only if no error is found
 IF (count EQ 0) THEN BEGIN
   OPENW, lun, dir + '\' + 're_checked_0_error.txt', /GET_LUN
   PRINTF, lun, 'Checked on ' + STRTRIM(SYSTIME(),2)

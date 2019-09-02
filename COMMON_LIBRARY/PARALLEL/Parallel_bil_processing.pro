@@ -68,7 +68,7 @@ IF (nl LT nPro) THEN BEGIN
 ENDIF
 oIDLBridgeArray = OBJARR(nPro)      ;array of Bridge objects, one object = one child process that can be executed
 status = BYTARR(nPro)               ;array for storing the status of the childs
-ErrorString=STRARR(nPro)            ;array for storing potential problems of the chile
+ErrorString=STRARR(nPro)            ;array for storing potential problems of the child
 inactive = BYTARR(nPro)             ;array to store the lifecycle of each child, it is turned to 1 when no more results are expected from this child
 
 ;Initialize childs

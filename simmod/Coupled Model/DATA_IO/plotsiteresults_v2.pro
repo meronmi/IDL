@@ -89,7 +89,7 @@ FUNCTION plotSiteResults_v2, lombratio, siteEc_JD, siteSimNDVIJD, NDVIobsJD, sit
   th1 = TEXT(pos[2]-0.18, pos[3]-0.05, '$R^2$='+STRING(r_mod^2, FORMAT='(F4.2)', /PRINT)+', RMSE=' + STRING(RMSE_mod, FORMAT='(F4.2)', /PRINT), COLOR='blue')
 
   gh_ec.Save, out_dir + '\' + 'Site_' + igbp + '_' + code + '.png', BORDER=10, RESOLUTION=300
-
+  ;gh_ec.Close
   dlmtr=','
   res = FILE_SEARCH(site_run_reportFn)
   IF (res EQ '') THEN BEGIN

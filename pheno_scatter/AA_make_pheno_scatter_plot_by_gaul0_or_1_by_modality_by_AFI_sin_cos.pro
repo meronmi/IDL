@@ -3,22 +3,26 @@ PRO AA_make_pheno_scatter_plot_by_gaul0_or_1_by_modality_by_AFI_sin_cos
 gaul_level = 1;1 ;can be gaul 0 or 1 
 saveSineCos4cluster = 1
 
-fn_units = '\\ies\h04\Foodsec\users\trainee\DensScatPlot\Input\gaul' + STRTRIM(gaul_level,2) + '_asap.img' ;0 or 1
-out_dir = '\\ies\h04\Foodsec\users\trainee\DensScatPlot\out_gaul' + STRTRIM(gaul_level,2)
+base_dir = '\\ies\d5\foodsec\Users\dimouma\trainee'
+
+fn_units = base_dir + '\DensScatPlot\Input\ASAP4\gaul' + STRTRIM(gaul_level,2) + '_asap.img' ;0 or 1
+out_dir = base_dir + '\DensScatPlot\ASAP4_out_gaul' + STRTRIM(gaul_level,2)
 FILE_MKDIR, out_dir
 
-fn_sos = ['\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\pheno1-36\phenos1_1_36.img', $
-          '\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\pheno1-36\phenos2_1_36.img']
-fn_eos = ['\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\pheno1-36\phenoe1_1_36.img', $
-          '\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\pheno1-36\phenoe2_1_36.img']
-fn_afi = '\\ies\h04\Foodsec\asap.2.0\data\ref\land_cover\mask_crop_afi_masked.img'
-fn_pix_act_area = '\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\area_grid_m2.img'
+fn_sos = base_dir + ['\Pheno_asap4\pheno1-36\phenos1_1_36.img', $
+          '\Pheno_asap4\pheno1-36\phenos2_1_36.img']
+fn_eos = base_dir + ['\Pheno_asap4\pheno1-36\phenoe1_1_36.img', $
+          '\Pheno_asap4\pheno1-36\phenoe2_1_36.img']
+;fn_sos = ['\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\pheno1-36\phenos1_1_36.img', $
+;          '\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\pheno1-36\phenos2_1_36.img']
+;fn_eos = ['\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\pheno1-36\phenoe1_1_36.img', $
+;          '\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\pheno1-36\phenoe2_1_36.img']
+fn_afi = 'Y:\asap.4.0\data\ref\land_cover\mask_crop_afi_masked.img'
+;fn_afi = '\\ies\h04\Foodsec\asap.2.0\data\ref\land_cover\mask_crop_afi_masked.img'
+fn_pix_act_area = base_dir + '\Pheno_asap2_0\area_grid_m2.img'  ;20/5/2019: I keep this, there should be minor diff
 
-;fn_sos = ['\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\crop_masked_pheno1-36\cropAfiGT25_phenos1_1_36.img', $
-;          '\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\crop_masked_pheno1-36\cropAfiGT25_phenos2_1_36.img']
-;fn_eos = ['\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\crop_masked_pheno1-36\cropAfiGT25_phenoe1_1_36.img', $
-;          '\\ies\h04\Foodsec\users\trainee\Pheno_asap2_0\crop_masked_pheno1-36\cropAfiGT25_phenoe2_1_36.img']
-fn_table = '\\ies\h04\Foodsec\users\trainee\DensScatPlot\Input\gaul1_asap_analyzed_3.csv'
+fn_table = base_dir + '\4CALENDAR_asap4\asap4level1_chad_RDC.csv'
+;fn_table = '\\ies\h04\Foodsec\users\trainee\DensScatPlot\Input\gaul1_asap_analyzed_3.csv'
 
 
 ;read table with units id and admin name

@@ -1,0 +1,69 @@
+PRO Raphael_read_once_and_sav
+  ;csv_file = 'D:\RAPHAEL_pheno_test\LUCAS_S1-S2_extraction_20190325.csv'
+  csv_file = 'D:\RAPHAEL_pheno_test\LUCAS_S1-S2_extraction_20190328.csv'
+  res = READ_CSV(csv_file, HEADER=hdr)
+  x = rename_tags(res, TAG_NAMES(res), ['pid','pointID','date','nuts0_1','cropname','x','y','buffer','index_name','index_value'])
+  ;compute VH/VV
+  uniqID = x.pointID[UNIQ(x.pointID, SORT(x.pointID))]
+  PRINT, N_ELEMENTS(uniqID)
+  pid = [x.pid]
+  pointID = [x.pointID]
+  date = [x.date]
+  nuts0_1 = [x.nuts0_1]
+  cropname = [x.cropname]
+  ics = [x.x]
+  why = [x.y]
+  buffer = [x.buffer]
+  index_name = [x.index_name]
+  index_value = [x.index_value]
+  last= -99
+  FOR i = 0, N_ELEMENTS(uniqID)-1 DO BEGIN
+    ;IF (uniqID[i] EQ 30622266) THEN STOP
+    indVV_ID = WHERE((x.pointID EQ uniqID[i]) AND x.index_name EQ 'VV_mean', countVV_ID)
+    indVH_ID = WHERE((x.pointID EQ uniqID[i]) AND x.index_name EQ 'VH_mean', countVH_ID)
+    IF (countVV_ID NE countVH_ID) THEN STOP
+    IF (countVV_ID GT 0) THEN BEGIN
+      ;check dates
+      dateVV= YYYYbMMbDD2jd(x.date[indVV_ID])
+      dateVH= YYYYbMMbDD2jd(x.date[indVH_ID])
+      IF (TOTAL(ABS(dateVV-dateVH)) NE 0) THEN STOP
+      ;it is the same stuffm compute VH/VV ratio (here I assume that data are not in dB, they are *_FLOAT of GEE
+      VH_VV = 10.0 * ALOG10(x.index_value[indVH_ID]) - 10.0 * ALOG10(x.index_value[indVV_ID])
+      ;it may happen that values comes from the border of the scene where values are noise and are equal, resulting in a ratio of 0, set NaN
+      ind0 = WHERE(VH_VV EQ 0, count0)
+      IF (count0 GT 0) THEN VH_VV[ind0]=!VALUES.F_NAN
+      ;it may also happen that they are not equal but both very small, resulting in VH_VV close to 0
+      ;according to guido anu value < 10^(-4) is noise
+      indVV0 = WHERE(x.index_value[indVV_ID] LT 0.0001, countVV0)
+      indVH0 = WHERE(x.index_value[indVH_ID] LT 0.0001, countVH0)
+      IF (countVV0 GT 0) THEN VH_VV[indVV0]=!VALUES.F_NAN
+      IF (countVH0 GT 0) THEN VH_VV[indVH0]=!VALUES.F_NAN
+      ;check what happens when it is greater than 0
+      ;IF (MAX(VH_VV, /NAN) GT 0) THEN STOP
+      ;add it to strcuture
+      maxPid = MAX(x.pid)
+      pid = [pid, maxPid + 1 + INDGEN(countVV_ID)]
+      pointID = [pointID, x.pointID[indVV_ID]]
+      date = [date, x.date[indVV_ID]]
+      nuts0_1 = [nuts0_1, x.nuts0_1[indVV_ID]]
+      cropname = [cropname, x.cropname[indVV_ID]]
+      ics = [ics, x.x[indVV_ID]]
+      why = [why, x.y[indVV_ID]]
+      buffer = [buffer, x.buffer[indVV_ID]]
+      index_name = [index_name, STRARR(countVV_ID)+'VH_VV_ratio']
+      index_value = [index_value, VH_VV]
+      res = CHECK_MATH()
+      IF (res NE 0) THEN BEGIN
+        PRINT, STRTRIM(uniqID[i],2) + ' id, VH/VV ratio raised this error (144 and 16: trying to make the log of neg and 0): ' + STRTRIM(res,2)
+      ENDIF
+    ENDIF ELSE BEGIN
+      PRINT, 'No S1 for id: ' + STRTRIM(uniqID[i],2)
+      IF (uniqID[i] EQ last) THEN STOP
+      last = uniqID[i]
+    ENDELSE
+  ENDFOR
+
+  x = CREATE_STRUCT($
+    'pid',pid,'pointID',pointID,'date',date,'nuts0_1',nuts0_1,'cropname',cropname,'x',ics,'y',why,'buffer',buffer,'index_name',index_name,'index_value',index_value)
+  SAVE, x,  FILENAME='D:\RAPHAEL_pheno_test\LUCAS_S1-S2_extraction_20190328.sav'
+END

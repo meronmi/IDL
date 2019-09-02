@@ -1,20 +1,41 @@
 FUNCTION ARC_corr_NDVI_WSI_startup
+  ;WSI7chirps Jan 2019
   disk_letter = 'D';'X';'D'
-  dir = 'ARC\2018 11 13 lastWSI';'ARC\2018 10 24 Anton';'ARC'
-  version = 'vTest'
+  dir = '\ARC\2019 01 24 WSIchirps'
+  version = 'wsi7chirps_MOS'
+  ;version = 'wsi7chirps_END'
   excludeHLwsi = 0
   IF (excludeHLwsi EQ 1) THEN  version = version + '_WSI20-80'
   startup = CREATE_STRUCT($
     'dir', disk_letter + ':\' + dir, $
     'version', version, $
     'fn_NDVI', disk_letter + ':\' + dir + '\' + ['seasonalNDVI_unimodal.csv', 'seasonalNDVI_bimodal1.csv', 'seasonalNDVI_bimodal2.csv'], $
-    'fn_WSI', disk_letter + ':\' + dir + '\' + ['seasonalWSIendValue_unimodal.csv','seasonalWSIendValue_bimodal1.csv','seasonalWSIendValue_bimodal2.csv'], $
+    'fn_WSI', disk_letter + ':\' + dir + '\' + ['seasonalWSIendValue_unimodal_CHIRPS.csv','seasonalWSIendValue_bimodal1_CHIRPS.csv','seasonalWSIendValue_bimodal2_CHIRPS.csv'], $
+    ;'fn_WSI', disk_letter + ':\' + dir + '\' + ['seasonalWSImosValue_unimodal_CHIRPS.csv','seasonalWSImosValue_bimodal1_CHIRPS.csv','seasonalWSImosValue_bimodal2_CHIRPS.csv'], $
     'fn_corr', disk_letter + ':\' + dir + '\' + version + ['corr_unimodal.csv','corr_bimodal1.csv','corr_bimodal2.csv'], $
     'fn_nonParNEP', disk_letter + ':\' + dir + '\' + version + ['nonParNEP_unimodal.csv','nonParNEP_bimodal1.csv','nonParNEP_bimodal2.csv'], $
     'fn_ids', disk_letter + ':\' + dir + '\' + 'IdCorrespondence.csv', $
     'frstYear', 2002, $
     'nyear', 18, $
     'excludeHLwsi', excludeHLwsi) ;this is a test to exclude from regression those regions having a mean WSI LE 20 or GT 80%
+  
+;  ;WSI7 Nov 2018
+;  disk_letter = 'D';'X';'D'
+;  dir = 'ARC\2018 11 13 lastWSI';'ARC\2018 10 24 Anton';'ARC'
+;  version = 'vTest'
+;  excludeHLwsi = 0
+;  IF (excludeHLwsi EQ 1) THEN  version = version + '_WSI20-80'
+;  startup = CREATE_STRUCT($
+;    'dir', disk_letter + ':\' + dir, $
+;    'version', version, $
+;    'fn_NDVI', disk_letter + ':\' + dir + '\' + ['seasonalNDVI_unimodal.csv', 'seasonalNDVI_bimodal1.csv', 'seasonalNDVI_bimodal2.csv'], $
+;    'fn_WSI', disk_letter + ':\' + dir + '\' + ['seasonalWSIendValue_unimodal.csv','seasonalWSIendValue_bimodal1.csv','seasonalWSIendValue_bimodal2.csv'], $
+;    'fn_corr', disk_letter + ':\' + dir + '\' + version + ['corr_unimodal.csv','corr_bimodal1.csv','corr_bimodal2.csv'], $
+;    'fn_nonParNEP', disk_letter + ':\' + dir + '\' + version + ['nonParNEP_unimodal.csv','nonParNEP_bimodal1.csv','nonParNEP_bimodal2.csv'], $
+;    'fn_ids', disk_letter + ':\' + dir + '\' + 'IdCorrespondence.csv', $
+;    'frstYear', 2002, $
+;    'nyear', 18, $
+;    'excludeHLwsi', excludeHLwsi) ;this is a test to exclude from regression those regions having a mean WSI LE 20 or GT 80%
   RETURN, startup
 END
 
@@ -147,7 +168,7 @@ PRO ARC_corr_NDVI_WSI
         all_non_par_nepN = [all_non_par_nepN, non_par_nepN]
         all_nepW = [all_nepW, nepW]
         ; Pot w and N for an ID
-        plotID = 341  ;set it to 0 to skip
+        plotID = 341  ;set it to 0 to skip 341 is Bermo Niger
         IF (plotID NE 0) AND (id_infoWsi[0,j] EQ plotID) THEN BEGIN
 ;         IF ((i EQ 1) AND (id_infoWsi[0,j] GT 161))THEN BEGIN
           u = non_par_nepN ;all_N
@@ -175,8 +196,8 @@ PRO ARC_corr_NDVI_WSI
           gh = PLOT(u, v, POSITION=[0.075+0.325+0.3,0.15,0.3+0.325+0.3,0.9], SYMBOL = '+', SYM_SIZE=simsiz, LINESTYLE='', TITLE= 'All data, ' + FILE_BASENAME(startup.fn_corr[i],'.csv'), XTITLE = uVar, YTITLE = vVar, /CURRENT)
           gh = PLOT(x, res[0]+res[1]*x, LINESTYLE='-', COLOR='green', /OVERPLOT)
           gtxt = TEXT(0.955,0.03,'r = ' + STRTRIM(res[2],2) + ', P = ' + STRTRIM(res[3],2), ORIENTATION=90)
-          gh.close
           PRINT, 'debug'
+          gh.close
         ENDIF
         ;now correlations
         ;n nep vs w nep
@@ -293,6 +314,7 @@ PRO ARC_corr_NDVI_WSI
 ;    gh = PLOT(all_zN, all_zW, SYMBOL = '+', SYM_SIZE=.5, LINESTYLE='', TITLE= 'All data, ' + FILE_BASENAME(startup.fn_corr[i],'.csv'), XTITLE = 'zcNDVI', YTITLE = 'zWSI')
 ;    gh = PLOT(x, res[0]+res[1]*x, LINESTYLE='-', COLOR='red', /OVERPLOT)
 ;    gtxt = TEXT(0.15,0.02,'r = ' + STRTRIM(res[2],2) + ', P = ' + STRTRIM(res[3],2))
-    PRINT, '****'
+    PRINT, 'Finished'
   ENDFOR
+  CLOSE, /ALL
 END

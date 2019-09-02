@@ -1,0 +1,136 @@
+FUNCTION locate_largest_season_in_jd_range, xjd, y, rangejd
+; y: is typlically ndvi
+; xjd: is the time interval containing the year of interest. IT MUST contain the full year + a bit of previous (season can start there) and IT MAY
+; contain a bit of the the following yera
+; rangejd: the range, in julian days, of the year of interest where to look for the biggest season (define as highest y)
+; NOTE that max and minima in rangejd will be preferred to those occurring outside (even if there are smaller minima)
+; RETURN THE left and right subscript of minima
+
+doplot = 0
+season = CREATE_STRUCT('subLeft', 0, 'subRight', 0, 'subMax', 0, $
+  'ySmoothAtSubLeft', 0.0, 'ySmoothAtSubRight', 0.0, 'ySmoothAtSubMax', 0.0, 'retr', 0, 'code', FIX(0),'msg', '')
+
+;linearly iterpolate over a regular grid
+xjd_reg = FINDGEN(xjd[-1]-xjd[0]+1)+xjd[0] 
+;first linear interpolate
+y_reg = INTERPOL(y, xjd, xjd_reg)
+;cloud = y_reg *0.0 + 1
+cloud = y_reg *0.0   
+;not necessary, it will interpolate again:the tell savgol that the interpolated values are cloudy = unrelaible
+FOR i = 0, N_ELEMENTS(xjd)-1 DO BEGIN
+  ind = WHERE(xjd[i] EQ xjd_reg)
+  y_reg[ind] = y[i]
+  ;cloud[ind] = 0
+ENDFOR
+width_climatology= 75
+width_on_upper_env = 45
+;smooth the y
+sago_interpol3_for_s2, y_reg, cloud, width_climatology, width_on_upper_env, smNDVI=y_regs1, iMax=100
+;smooth gain to remove hi-frequency variations
+width_climatology= 60
+width_on_upper_env = 30
+sago_interpol3_for_s2, y_regs1, y_regs1*0, width_climatology, width_on_upper_env, smNDVI=y_regs2, iMax=100
+
+;here we should have  a resonably smoothed function
+
+;locate max and nerarest min using extrema
+
+;mirror edges so that monotonic increment will generate a min on the left side and a max on the tight side
+;conversely, a monotonic decrease will generate a max on the left and min on the right
+y_regs2_edged = [REVERSE(y_regs2[1:5]),y_regs2,REVERSE(y_regs2[-6:-2])]
+subExtrema = Extrema(y_regs2_edged, signature = sig, number = num)
+;;bring it back to non edged
+subExtrema = subExtrema - 5
+ind = WHERE((subExtrema GE 0) AND (subExtrema LE (N_ELEMENTS(y_regs2)-1)), count)
+IF (count GT 0) THEN BEGIN
+  subExtrema = subExtrema[ind[SORT(ind)]]
+  sig = sig[ind[SORT(ind)]]
+ENDIF
+ 
+  
+subY_OfMax = subExtrema[WHERE(sig EQ 1)]
+;get the values of the maxima in range to determine the biggest
+subY_OfMaximaInPeriod = subY_OfMax[WHERE((xjd_reg[subY_OfMax] GE rangejd[0]) AND (xjd_reg[subY_OfMax] LE rangejd[1]))]
+;find out the biggest
+res = MAX(y_regs2[subY_OfMaximaInPeriod], ind)
+subY_BiggestMaxInPeriod = subY_OfMaximaInPeriod[ind]
+subExt_OfBiggestMaxInPeriod = WHERE(subExtrema EQ subY_BiggestMaxInPeriod)
+;Some checks:
+;1: is there a max in the required period? If not, return -100 (no relative maxima in the required period)
+IF (ind EQ -1) THEN BEGIN
+  season.retr = -1
+  season.code = -100
+  season.msg = 'locate_largest_season_in_jd_range: no relative maxima in the required period'
+  RETURN, season
+ENDIF
+;2: Does it has at least 3 obs in each side? If not, return -101 or -102 (relative maxima too close to data boundaries, left / right)
+IF (subY_BiggestMaxInPeriod LT 3) THEN BEGIN
+  season.retr = -1
+  season.code = -101
+  season.msg = 'locate_largest_season_in_jd_range: relative maximum in the required period too close to left data boundary (less than 3 obs). Tthe series should have more past data'
+  RETURN, season
+ENDIF
+IF (subY_BiggestMaxInPeriod GT N_ELEMENTS(y_regs2)-4) THEN BEGIN
+  season.retr = -1
+  season.code = -102
+  season.msg = 'locate_largest_season_in_jd_range: relative maximum in the required period too close to right data boundary (less than 3 obs). Tthe series should have more recent data'
+  RETURN, season
+ENDIF
+;3: is there a min after and befor this maximum? If not, set it at the beginning/end of the data (the function may be monotonic and the trick of mirroring resulted in a min
+;that is slighlhly outside y_regs2 and it is therefore removed
+; 3a: left side
+IF (subExt_OfBiggestMaxInPeriod EQ 0) THEN BEGIN ;ther is no, add one to the left
+  subExtrema = [0, subExtrema]
+  sig = [-1,sig] 
+  subExt_OfBiggestMaxInPeriod = subExt_OfBiggestMaxInPeriod + 1
+  season.code = -200
+  season.msg = 'locate_largest_season_in_jd_range: there was no min before the max in the period of interest, it was fixed to first data point (the series should have more past data)'
+ENDIF
+; 3a: right side
+IF (subExt_OfBiggestMaxInPeriod EQ N_ELEMENTS(subExtrema)-1) THEN BEGIN ;ther is no, add one to the right
+  subExtrema = [subExtrema,N_ELEMENTS(y_regs2)-1]
+  sig = [sig,-1]
+  season.code = -201
+  season.msg = 'locate_largest_season_in_jd_range: there was no min after the max in the period of interest, it was fixed to last data point (the series should have more recent data)'
+ENDIF
+
+;now take the min before and the min after
+;locate subY_BiggestMaxInPeriod in res
+
+;locate the elements of estrema that are within the rangejd
+subExt_OfElementsInPeriod = WHERE((xjd_reg[subExtrema] GE rangejd[0]) AND (xjd_reg[subExtrema] LE rangejd[1]))
+inRange = subExtrema * 0
+inRange[subExt_OfElementsInPeriod] = 1
+;now get the jd of the two minima and find the closest jd in original data
+subExt_MinLeft = findMinAwayFromMax(subExtrema, sig, subExt_OfBiggestMaxInPeriod, inRange, y_regs2, 'left')
+subExt_MinRight = findMinAwayFromMax(subExtrema, sig, subExt_OfBiggestMaxInPeriod, inRange, y_regs2, 'right')
+subY_MinLeft =  subExtrema[subExt_MinLeft]; xjd_reg[subY_MinLeft]
+subY_MinRight =  subExtrema[subExt_MinRight]; xjd_reg[subY_MinRight]
+
+xjdLeft =  xjd_reg[subY_MinLeft]; xjd_reg[subY_MinLeft]
+xjdRight =  xjd_reg[subY_MinRight]; xjd_reg[subY_MinRight]
+xjdMax = xjd_reg[subY_BiggestMaxInPeriod]
+
+IF (doplot eq 1) THEN BEGIN
+  h = PLOT(xjd_reg, y_reg)
+  h = PLOT(xjd, y, SYMBOL='o', LINESTYLE='',/OVERPLOT)
+  h = PLOT(xjd_reg, y_regs1, LINESTYLE='-',COLOR='grey',/OVERPLOT)
+  h = PLOT(xjd_reg, y_regs2, LINESTYLE='-',COLOR='r',/OVERPLOT)
+  h = PLOT([xjd_reg[subY_MinLeft],xjd_reg[subY_MinLeft]], [0,1], LINESTYLE='-',COLOR='b',/OVERPLOT)
+  h = PLOT([xjd_reg[subY_BiggestMaxInPeriod],xjd_reg[subY_BiggestMaxInPeriod]], [0,1], LINESTYLE='--',COLOR='black', /OVERPLOT)
+  h = PLOT([xjd_reg[subY_MinRight],xjd_reg[subY_MinRight]], [0,1], LINESTYLE='-',COLOR='g',/OVERPLOT)
+  h.close
+ENDIF
+res = MIN(ABS(xjd-xjdLeft[0]), subLonOriginalData) 
+res = MIN(ABS(xjd-xjdRight[0]), subRonOriginalData) 
+res = MIN(ABS(xjd-xjdMax), subMaxOnOriginalData)
+season.retr = 1
+season.subLeft=subLonOriginalData
+season.subRight=subRonOriginalData
+season.subMax=subMaxOnOriginalData
+season.ySmoothAtSubLeft=y_regs2[subY_MinLeft]
+season.ySmoothAtSubRight=y_regs2[subY_MinRight]
+season.ySmoothAtSubMax=y_regs2[subY_BiggestMaxInPeriod]
+
+RETURN, season
+END
